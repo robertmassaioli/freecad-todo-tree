@@ -49,3 +49,30 @@ class TodoTreeWorkbench(Gui.Workbench):
 
 Gui.addWorkbench(TodoTreeWorkbench)
 FreeCAD.Console.PrintLog("TodoTree: workbench registered successfully\n")
+
+# ── Startup dock bootstrap ─────────────────────────────────────────────────
+#
+# View → Panels is populated by MainWindow::populateDockWindowMenu() which
+# calls findChildren<QDockWidget*>() at menu-open time, so any dock added
+# via mw.addDockWidget() appears there automatically — no C++ registration
+# needed.  The only requirement is that the dock must be created before the
+# user opens that menu.
+#
+# We hook workbenchActivated, which fires once the first workbench's setup
+# sequence has fully completed and the main window is stable — the earliest
+# safe moment to call addDockWidget().  The hook disconnects itself after the
+# first firing so it runs exactly once per session.
+
+def _bootstrap_dock(wb_name: str) -> None:
+    mw = Gui.getMainWindow()
+    try:
+        mw.workbenchActivated.disconnect(_bootstrap_dock)
+    except RuntimeError:
+        pass  # already disconnected (PySide2 raises if not connected)
+    from .dock_widget import show_dock
+    show_dock()
+
+_mw = Gui.getMainWindow()
+if _mw is not None:
+    _mw.workbenchActivated.connect(_bootstrap_dock)
+del _mw

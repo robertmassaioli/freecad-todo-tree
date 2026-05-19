@@ -77,6 +77,19 @@ delete dw;
 
 This runs every time a workbench is activated, including at startup. The `workbenchActivated` Qt signal on `MainWindow` fires after this sequence completes. At that point `getMainWindow()` is fully initialised and `addDockWidget()` is safe to call.
 
+### `DockWindowManager` internals — two separate data structures
+
+`DockWindowManager` keeps two distinct collections:
+
+- **`_dockWindows`** (`QMap<QString, QPointer<QWidget>>`) — the **persistent registry**. Built-in panels register here once at app startup via `registerDockWindow("Std_ReportView", widget)`. `setup()` looks up panels from here by name when a workbench requests them.
+- **`_dockedWindows`** (`QList<QDockWidget*>`) — the **currently active** dock containers visible in the main window. This list is what `saveState()` iterates when persisting per-workbench layout.
+
+Our dock is in neither list. `setup()` iterates `DockWindowItems` names, looks them up in `_dockWindows`, and only touches what it finds. Because our name is not registered, we are invisible to it — which is exactly why we survive workbench switches unaffected.
+
+### Python workbenches always get the standard panel set
+
+`PythonWorkbench::setupDockWindows()` (`Workbench.cpp` line 1335) simply delegates to `StdWorkbench::setupDockWindows()`, which hardcodes all the built-in panels (TreeView, PropertyView, ReportView, etc.). There is no way for a Python workbench subclass to override this — `setupDockWindows()` is not virtualised to Python. This is another confirmation that the only viable Python path is direct `mw.addDockWidget()`.
+
 ---
 
 ## The Fix: Two Lines in `init_gui.py`

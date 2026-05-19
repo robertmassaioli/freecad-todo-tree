@@ -16,6 +16,10 @@ import FreeCADGui
 
 from .tree_panel import TreePanel
 
+
+def _log(msg):
+    FreeCAD.Console.PrintMessage(f"TodoTree [dock] {msg}\n")
+
 _dock_instance = None
 _observer = None
 
@@ -57,17 +61,40 @@ class TodoDockWidget(QDockWidget):
 
 
 class _DocObserver:
+    def __init__(self):
+        # Names of documents currently mid-restore. slotActivateDocument
+        # fires with an empty objects list while a file is loading; we skip
+        # those calls and wait for slotFinishRestoreDocument instead.
+        self._restoring: set = set()
+
+    def slotStartRestoreDocument(self, doc):
+        _log(f"slotStartRestoreDocument doc={doc.Name!r}")
+        self._restoring.add(doc.Name)
+
+    def slotFinishRestoreDocument(self, doc):
+        _log(f"slotFinishRestoreDocument doc={doc.Name!r} objects={[o.Name for o in doc.Objects]!r}")
+        self._restoring.discard(doc.Name)
+        dock = get_dock()
+        if dock:
+            dock.switch_to_document(doc)
+
     def slotActivateDocument(self, doc):
+        if doc.Name in self._restoring:
+            _log(f"slotActivateDocument doc={doc.Name!r} SKIPPED (mid-restore)")
+            return
+        _log(f"slotActivateDocument doc={doc.Name!r} objects={[o.Name for o in doc.Objects]!r}")
         dock = get_dock()
         if dock:
             dock.switch_to_document(doc)
 
     def slotCreatedDocument(self, doc):
-        pass  # Model created lazily on first use.
+        _log(f"slotCreatedDocument doc={doc.Name!r}")
 
     def slotDeletedDocument(self, doc):
+        _log(f"slotDeletedDocument doc={doc.Name!r}")
         from .model_registry import invalidate_model
         invalidate_model(doc.Name)
+        self._restoring.discard(doc.Name)
         dock = get_dock()
         if dock:
             active = FreeCAD.ActiveDocument

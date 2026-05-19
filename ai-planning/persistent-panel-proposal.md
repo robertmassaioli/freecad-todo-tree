@@ -1,98 +1,122 @@
 # Persistent Panel Proposal (Report-View Style)
 
 **Date:** 2026-05-19  
-**Status:** Proposal — pending implementation decision
+**Status:** Revised after deep FreeCAD source analysis
 
 ---
 
-## What Already Exists
+## What Already Works
 
-The current `TodoDockWidget` is already a persistent dock. Once created, it:
+Our `TodoDockWidget` is already a persistent dock. Once created it:
 
-- Stays visible when the user switches to any other workbench (PartDesign, Sketcher, etc.)
-- Automatically shows the todo tree for whichever document becomes active
-- Shows a placeholder ("Open a document to use Todo Tree") when no document is open
-- Is managed entirely outside FreeCAD's per-workbench layout system, so workbench switches never hide it
+- Stays visible when switching to any workbench (confirmed by source: `DockWindowManager::setup()` only manages docks it registered; ours bypasses that system entirely)
+- Automatically shows the active document's todos via `_DocObserver`
+- **Already appears in `View → Panels`** — the menu is populated dynamically by `MainWindow::populateDockWindowMenu()` which calls `findChildren<QDockWidget*>()` on the main window at menu-open time. Any dock added with `mw.addDockWidget()` is included automatically, no C++ registration required.
 
-**The only gap:** the dock is created the first time the user activates the TodoTree workbench. If the user never switches to that workbench in a given FreeCAD session, the dock never appears. This is unlike Report View, which is available from the moment FreeCAD starts.
-
----
-
-## Desired Behaviour
-
-The Todo Tree panel should be available immediately at FreeCAD startup:
-
-- Visible in **View → Panels → Todo Tree** (the same menu as Report View, Model, etc.)
-- Openable without ever switching to the TodoTree workbench
-- Persistently visible across all workbench switches, just as it is today once created
+The only gap: the dock is created the first time the user activates the TodoTree workbench. If they never do, it doesn't exist yet.
 
 ---
 
-## Why This Is Non-Trivial
+## What the Source Says
 
-FreeCAD's **View → Panels** menu is populated by `DockWindowManager::registerDockWindow()` — a C++ singleton not exposed to Python. Standard Python addons cannot add entries to that menu.
+### `View → Panels` menu — `MainWindow.cpp` lines 1593–1615
 
-What Python addons *can* do:
+```cpp
+void MainWindow::onDockWindowMenuAboutToShow() {
+    auto menu = static_cast<QMenu*>(sender());
+    menu->clear();
+    populateDockWindowMenu(menu);
+}
 
-1. Call `mw.addDockWidget(area, dock)` at any time after the main window exists.
-2. Attach to Qt signals on the main window (`workbenchActivated`) or FreeCAD events to know when the GUI is ready.
-3. Register `WorkbenchManipulator` instances that run on every workbench switch.
+void MainWindow::populateDockWindowMenu(QMenu* menu) {
+    QList<QDockWidget*> dock = this->findChildren<QDockWidget*>();
+    for (auto& it : dock) {
+        menu->addAction(it->toggleViewAction());
+    }
+}
+```
 
-The challenge is **timing**: `InitGui.py` runs at FreeCAD startup, but at that point the main window may not yet be fully initialised and `getMainWindow()` may return `None` or a partially-built window.
+**Every `QDockWidget` child of the main window is listed.** No registration step needed.
 
----
+### `WorkbenchManipulator::modifyDockWindows()` — dead end
 
-## Proposed Solution: Deferred Startup via `workbenchActivated` Signal
+The Python binding calls `tryModifyDockWindows(dict, dockWindow)` whose body is:
 
-Hook the main window's `workbenchActivated(name: str)` Qt signal. This fires once for every workbench switch, including the very first one at FreeCAD startup (when the default workbench, typically `NoneWorkbench` or the user's saved workbench, is activated). We use this as the trigger to create the dock the first time, then immediately disconnect — so the hook runs exactly once.
+```cpp
+void WorkbenchManipulatorPython::tryModifyDockWindows(
+    [[maybe_unused]] const Py::Dict& dict,
+    [[maybe_unused]] DockWindowItems* dockWindow)
+{}
+```
+
+Empty. Marked `[[maybe_unused]]`. Never implemented. Not a viable path.
+
+### `DockWindowItems` — no Python binding
+
+`DockWindowItems::addDockWidget(name, pos, option)` is C++ only. There is no Python binding anywhere in the source tree.
+
+### BIM module uses exactly our approach
+
+`BimViews.py` lines 160–175:
 
 ```python
-# In init_gui.py, at module level (runs when the addon loads):
+mw = FreeCADGui.getMainWindow()
+mw.addDockWidget(self.getDockArea(area), vm)
+```
 
-def _create_dock_on_first_workbench(wb_name: str):
-    """Called once after the first workbench activates at startup."""
+Direct `mw.addDockWidget()`. Same mechanism we use. BIM panels appear in `View → Panels` automatically.
+
+### Startup timing — `Workbench.cpp` lines 463–466
+
+```cpp
+DockWindowItems* dw = setupDockWindows();
+WorkbenchManipulator::changeDockWindows(dw);  // Python modifyDockWindows (empty)
+DockWindowManager::instance()->setup(dw);     // applies panel visibility
+delete dw;
+```
+
+This runs every time a workbench is activated, including at startup. The `workbenchActivated` Qt signal on `MainWindow` fires after this sequence completes. At that point `getMainWindow()` is fully initialised and `addDockWidget()` is safe to call.
+
+---
+
+## The Fix: Two Lines in `init_gui.py`
+
+The entire gap is solved by creating the dock during addon load, deferred to the first `workbenchActivated` signal — which fires within milliseconds of startup as FreeCAD activates the user's saved workbench.
+
+```python
+# init_gui.py — add after Gui.addWorkbench(TodoTreeWorkbench)
+
+def _bootstrap_dock(wb_name: str) -> None:
+    """Create the Todo Tree dock on the first workbench activation at startup."""
+    mw = Gui.getMainWindow()
+    mw.workbenchActivated.disconnect(_bootstrap_dock)
     from .dock_widget import show_dock
-    mw = FreeCADGui.getMainWindow()
-    mw.workbenchActivated.disconnect(_create_dock_on_first_workbench)
     show_dock()
 
-mw = FreeCADGui.getMainWindow()
+mw = Gui.getMainWindow()
 if mw is not None:
-    mw.workbenchActivated.connect(_create_dock_on_first_workbench)
+    mw.workbenchActivated.connect(_bootstrap_dock)
 ```
 
-This has a well-defined invariant: the dock is created no later than the first workbench switch, which happens within milliseconds of FreeCAD's GUI becoming ready. From the user's perspective the dock is simply "always there".
+### Why `workbenchActivated` and not `QTimer.singleShot(0, ...)`?
 
-### Why not `QTimer.singleShot(0, show_dock)`?
+A zero-delay timer fires after the current event loop turn. At addon-load time during FreeCAD startup, the main window layout is mid-construction — the dock areas may not be finalised. `workbenchActivated` fires at an exact, well-defined point: after the workbench's setup sequence has completed and the main window is stable. This is the same moment FreeCAD itself calls `DockWindowManager::setup()`.
 
-A zero-delay timer fires after the current event loop iteration completes, which sounds right but is unreliable at startup because the main window's layout isn't stable yet. The `workbenchActivated` signal fires at exactly the right moment — after Qt has finished building the workbench UI.
+### Why not call `show_dock()` directly at module level?
 
-### Why not a `WorkbenchManipulator`?
-
-`WorkbenchManipulator` is a FreeCAD C++/Python bridge that runs on every workbench switch. We could call `show_dock()` from it, but `show_dock()` is idempotent (does nothing if the dock already exists), so calling it on every workbench switch is harmless but wasteful. The one-time signal connection is cleaner.
+`init_gui.py` runs during FreeCAD's Python module scan, before the main window fully exists. `getMainWindow()` may return `None` at this point. The deferred approach is safe even if `getMainWindow()` returns `None` (the connection is simply not made; the dock will be created when the user first activates the TodoTree workbench as today).
 
 ---
 
-## View → Panels Integration
+## Resulting Behaviour
 
-Since `DockWindowManager::registerDockWindow()` is not accessible from Python, we cannot add an entry to the native **View → Panels** menu. Two workarounds:
-
-**Option A — Todo Tree menu item (simplest):**  
-Add "Show Todo Panel" to the top-level **Todo Tree** menu (already exists via `appendMenu`). Users open the panel from here if they accidentally close it. This is exactly what many other Python addons do.
-
-**Option B — View menu injection:**  
-`appendMenu(["View", "Panels"], ["TodoTree_ShowDock"])` adds the command to `View → Panels` via FreeCAD's Python menu API. This places it alongside Report View, Python Console etc. in the exact right location.  
-Risk: The `"Panels"` submenu name is locale-dependent (translated in non-English FreeCAD). A fallback to Option A is needed if the submenu can't be found.
-
-**Recommendation: Option B, with Option A as fallback.** Try to inject into `View → Panels`; if the submenu is absent (translated or restructured), fall back to the Todo Tree menu.
-
-```python
-# In TodoTreeWorkbench.Initialize():
-try:
-    self.appendMenu(["&View", "Panels"], ["TodoTree_ShowDock"])
-except Exception:
-    self.appendMenu("Todo Tree", ["TodoTree_ShowDock"])
-```
+| Situation | Before | After |
+|---|---|---|
+| User launches FreeCAD, never switches to TodoTree workbench | Dock not created | Dock created automatically on first workbench activation |
+| User opens `View → Panels` | "Todo Tree" absent until workbench visited | "Todo Tree" present from first session |
+| User closes the dock (clicks X) | Must re-open from TodoTree workbench | Can re-open from `View → Panels` |
+| Dock tracks active document | Yes (once created) | Yes (same behaviour) |
+| Dock persists across workbench switches | Yes (once created) | Yes (same behaviour) |
 
 ---
 
@@ -100,27 +124,14 @@ except Exception:
 
 | File | Change |
 |---|---|
-| `init_gui.py` | Connect `workbenchActivated` signal at module load to create dock on first startup |
-| `init_gui.py` | Attempt to inject `TodoTree_ShowDock` into `View → Panels` menu |
-| `dock_widget.py` | No change needed — `show_dock()` is already idempotent |
+| `init_gui.py` | Add ~8 lines: connect `workbenchActivated` to `_bootstrap_dock` after workbench registration |
 
-No changes to any other file. The dock widget, observer, and tree panel are already implemented correctly — this proposal is purely about *when* the dock is first created.
-
----
-
-## What Changes From the User's Perspective
-
-| Before | After |
-|---|---|
-| Must switch to Todo Tree workbench at least once per session | Panel appears immediately at FreeCAD startup |
-| Panel listed only in Todo Tree workbench menu | Panel listed in View → Panels (or Todo Tree menu as fallback) |
-| Panel state restored from QMainWindow saved state on restart | Same — no change |
-| Dock tracks active document automatically | Same — no change |
+No other files need to change. `show_dock()` in `dock_widget.py` is already idempotent — calling it more than once is safe.
 
 ---
 
 ## Open Questions
 
-1. **Default visibility:** Should the dock start hidden (user opens it from the menu) or start visible? Starting visible is consistent with Report View behaviour but may annoy users who never use the addon. Starting hidden (dock exists but `hide()` is called) is safer — the user still gets it in View → Panels without it cluttering their layout on first launch.
+1. **Default visibility:** Should the dock start visible or hidden? Starting visible mirrors Report View behaviour. Starting hidden (dock exists but is closed) is less intrusive for users who never use the addon. Recommended: start visible — the user explicitly installed the addon.
 
-2. **Locale robustness of `View → Panels`:** The submenu name needs testing on non-English FreeCAD. The `appendMenu` API uses the untranslated name (the key), so `"Panels"` should work regardless of locale if FreeCAD uses internal menu IDs — but this needs verification.
+2. **One-time connect safety:** The `disconnect` inside `_bootstrap_dock` must not throw if the signal was already disconnected. In PySide6 this is safe; in PySide2 a `RuntimeError` is raised if the signal is not connected. A `try/except RuntimeError: pass` guard may be needed for PySide2 compatibility.

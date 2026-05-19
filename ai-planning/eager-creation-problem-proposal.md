@@ -158,6 +158,69 @@ Commands that require the object (`+ Item`, `+ Child`, etc.) continue to call
   empty tree. This is a minor UX difference that is reasonable — many apps
   show an empty state until you create your first item.
 
+### Option B placeholder design
+
+There are two distinct placeholder states:
+
+**State 1 — No document open** *(existing)*  
+The current `QLabel("Open a document to use Todo Tree.")` remains unchanged.
+
+**State 2 — Document open, no TodoTree yet** *(new)*  
+Three sub-options:
+
+**B1 — Minimal text + action button (recommended)**
+```
+┌─────────────────────────────┐
+│                             │
+│                             │
+│     No todo items yet.      │
+│                             │
+│   [ + Add your first item ] │
+│                             │
+│                             │
+└─────────────────────────────┘
+```
+A centered label and a single `QPushButton` that triggers the same action as
+the `+ Item` toolbar button. Clicking it creates the `TodoTree` object and
+immediately opens the new item in inline edit mode. Clean, action-oriented,
+zero ambiguity.
+
+**B2 — Icon + description + button**
+```
+┌─────────────────────────────┐
+│                             │
+│         [logo icon]         │
+│                             │
+│  Organise tasks for this    │
+│  document as a tree.        │
+│                             │
+│   [ + Add your first item ] │
+│                             │
+└─────────────────────────────┘
+```
+Slightly more onboarding-friendly; useful if users discover the panel
+without having explicitly opened it.
+
+**B3 — Text only, pointing to the toolbar**
+```
+┌─────────────────────────────┐
+│                             │
+│  No todo items yet.         │
+│                             │
+│  Use the + Item button in   │
+│  the toolbar above to add   │
+│  your first task.           │
+│                             │
+└─────────────────────────────┘
+```
+No button in the placeholder. Simplest to implement but creates a dead-end
+feel — users see text but nothing to interact with.
+
+**Chosen: B1.** A single action button directly in the placeholder converts
+"nothing here" to "adding my first item" in one click without requiring the
+user to locate the toolbar. This pattern is standard in modern productivity
+apps (Notion, Linear, Todoist).
+
 ---
 
 ## Option C — Guard on `doc.Objects` being non-empty

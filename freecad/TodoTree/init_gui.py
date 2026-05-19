@@ -6,12 +6,12 @@
 import FreeCAD
 import FreeCADGui as Gui
 
-FreeCAD.Console.PrintMessage("TodoTree: init_gui.py starting\n")
+FreeCAD.Console.PrintLog("TodoTree: init_gui.py starting\n")
 
 from .resources import as_icon
 from .commands import register_commands
 
-FreeCAD.Console.PrintMessage("TodoTree: imports complete\n")
+FreeCAD.Console.PrintLog("TodoTree: imports complete\n")
 
 
 class TodoTreeWorkbench(Gui.Workbench):
@@ -46,4 +46,4 @@ class TodoTreeWorkbench(Gui.Workbench):
 
 
 Gui.addWorkbench(TodoTreeWorkbench)
-FreeCAD.Console.PrintMessage("TodoTree: workbench registered successfully\n")
+FreeCAD.Console.PrintLog("TodoTree: workbench registered successfully\n")

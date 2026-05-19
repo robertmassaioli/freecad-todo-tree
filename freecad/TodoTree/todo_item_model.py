@@ -7,6 +7,7 @@ from PySide.QtCore import Qt, Signal, QAbstractItemModel, QModelIndex
 from PySide.QtGui import QColor, QFont
 
 from .todo_model import TodoTree
+from .debug import log
 import json
 
 
@@ -90,10 +91,7 @@ class TodoItemModel(QAbstractItemModel):
         if role in (Qt.DisplayRole, Qt.EditRole):
             return node.text
         if role == Qt.CheckStateRole:
-            import FreeCAD
-            FreeCAD.Console.PrintMessage(
-                f"TodoTree data(CheckStateRole): node={node.text!r} done={node.done!r}\n"
-            )
+            log(f"data(CheckStateRole): node={node.text!r} done={node.done!r}")
             # Return plain integers so Qt6's C++ delegate can call toInt() correctly.
             # Returning a Python enum causes Qt6 to always read the state as 0 (Unchecked),
             # making unchecking impossible (it always re-checks the item).
@@ -110,13 +108,9 @@ class TodoItemModel(QAbstractItemModel):
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
-        import FreeCAD
-        FreeCAD.Console.PrintMessage(
-            f"TodoTree setData: role={role!r} value={value!r} "
-            f"Qt.EditRole={Qt.EditRole!r} Qt.CheckStateRole={Qt.CheckStateRole!r}\n"
-        )
+        log(f"setData: role={role!r} value={value!r}")
         if not index.isValid():
-            FreeCAD.Console.PrintMessage("TodoTree setData: index invalid, returning False\n")
+            log("setData: index invalid, returning False")
             return False
         node = index.internalPointer()
         doc = self._fc_object.Document
@@ -136,11 +130,9 @@ class TodoItemModel(QAbstractItemModel):
             # value may be a Python enum or a plain int depending on what called setData.
             # bool() works for both: 0/Unchecked → False, 2/Checked → True.
             done = bool(value)
-            FreeCAD.Console.PrintMessage(
-                f"TodoTree setData CheckStateRole: value={value!r} done={done!r} node.done={node.done!r}\n"
-            )
+            log(f"setData CheckStateRole: value={value!r} done={done!r} node.done={node.done!r}")
             if done == node.done:
-                FreeCAD.Console.PrintMessage("TodoTree setData: no change, returning False\n")
+                log("setData CheckStateRole: no change, returning False")
                 return False
             doc.openTransaction("Todo: toggle done")
             self._tree.set_done(node.id, done)
@@ -155,8 +147,7 @@ class TodoItemModel(QAbstractItemModel):
         if not index.isValid():
             return Qt.NoItemFlags
         f = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsUserCheckable
-        import FreeCAD
-        FreeCAD.Console.PrintMessage(f"TodoTree flags: {f!r}  UserCheckable={Qt.ItemIsUserCheckable!r}\n")
+        log(f"flags: {f!r}")
         return f
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):

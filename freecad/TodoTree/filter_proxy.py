@@ -4,6 +4,7 @@
 """QSortFilterProxyModel that hides done nodes (and their entire subtrees)."""
 
 from PySide.QtCore import Qt, QSortFilterProxyModel
+from .debug import log
 
 
 class DoneFilterProxy(QSortFilterProxyModel):
@@ -26,8 +27,7 @@ class DoneFilterProxy(QSortFilterProxyModel):
         return self._show_done
 
     def setData(self, index, value, role=Qt.EditRole):
-        import FreeCAD
-        FreeCAD.Console.PrintMessage(f"TodoTree proxy.setData: role={role!r} value={value!r}\n")
+        log(f"proxy.setData: role={role!r} value={value!r}")
         return super().setData(index, value, role)
 
     def filterAcceptsRow(self, source_row, source_parent):

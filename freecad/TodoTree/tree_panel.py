@@ -25,17 +25,16 @@ from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
 import FreeCAD as _fc
 
 from .breadcrumb_widget import BreadcrumbWidget
+from .debug import log
 from .filter_proxy import DoneFilterProxy
 
 
 class _ClickLogger(QObject):
-    """Event filter that logs mouse presses on the tree view viewport."""
+    """Event filter that logs mouse presses on the tree view viewport (debug only)."""
     def eventFilter(self, obj, event):
         if event.type() == QEvent.MouseButtonPress:
-            _fc.Console.PrintMessage(
-                f"TodoTree viewport click: pos={event.pos().x()},{event.pos().y()} "
-                f"button={event.button()!r}\n"
-            )
+            from .debug import log
+            log(f"viewport click: pos={event.pos().x()},{event.pos().y()} button={event.button()!r}")
         return False  # don't consume the event
 
 
@@ -120,12 +119,7 @@ class TreePanel(QWidget):
         self._tree_view.setModel(self._proxy)
         self._tree_view.setHeaderHidden(True)
         trigger = QAbstractItemView.DoubleClicked
-        import FreeCAD
-        FreeCAD.Console.PrintMessage(f"TodoTree: QAbstractItemView.DoubleClicked = {trigger!r}\n")
-        FreeCAD.Console.PrintMessage(f"TodoTree: QAbstractItemView.EditTrigger values = "
-                                  f"{list(QAbstractItemView.EditTrigger)!r}\n"
-                                  if hasattr(QAbstractItemView, 'EditTrigger') else
-                                  "TodoTree: QAbstractItemView.EditTrigger not found\n")
+        log(f"QAbstractItemView.DoubleClicked = {trigger!r}")
         self._tree_view.setEditTriggers(QAbstractItemView.DoubleClicked)
         self._tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tree_view.setContextMenuPolicy(Qt.CustomContextMenu)

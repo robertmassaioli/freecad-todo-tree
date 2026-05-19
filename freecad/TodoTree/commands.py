@@ -180,10 +180,10 @@ class _ClearAllCommand:
     def GetResources(self):
         return {
             "Pixmap": as_icon("Delete"),
-            "MenuText": "Clear Todo List",
+            "MenuText": "Reset Todo List",
             "ToolTip": (
-                "Remove all Todo Tree data from this document and start fresh. "
-                "Also removes any duplicate TodoTree objects left by earlier bugs."
+                "Remove all todo items from this document and start fresh. "
+                "Also cleans up any duplicate TodoTree objects left by earlier versions."
             ),
         }
 
@@ -203,7 +203,7 @@ class _ClearAllCommand:
         mw = FreeCADGui.getMainWindow()
         answer = QMessageBox.warning(
             mw,
-            "Clear Todo List",
+            "Reset Todo List",
             "This will permanently delete all todo items in this document.\n\n"
             "This cannot be undone.\n\nAre you sure?",
             QMessageBox.Ok | QMessageBox.Cancel,

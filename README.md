@@ -2,6 +2,10 @@
 
 A FreeCAD workbench that adds a hierarchical, per-document todo list to your `.FCStd` files. Organise tasks in a tree, navigate into subtrees, and pick up exactly where you left off every time you open the file.
 
+<img src='Resources/Media/Overview.png' />
+
+*Todo Tree panel open while working in the Part Design workbench.*
+
 ## What it is
 
 TodoTree gives you a task list that lives inside your FreeCAD document. Every item can have child items, giving you a tree structure that mirrors the natural hierarchy of a design project — milestones at the top, sub-tasks underneath, and implementation notes below those. The view supports zooming into any subtree so you can focus on one branch without the rest cluttering the screen, with a breadcrumb trail back up to the root.
@@ -15,7 +19,12 @@ Key capabilities:
 - **Inline editing** — double-click any item to rename it in place.
 - **Full undo/redo** — add, delete, rename, and toggle operations are all on FreeCAD's undo stack (Ctrl+Z / Ctrl+Y).
 - **View state persistence** — the breadcrumb position, expanded nodes, and show-done toggle are restored exactly as you left them when you reopen the file.
+- **Indent / outdent** — promote or demote any item one level with Tab / Shift+Tab; children always travel with the moved node.
 - **Per-document** — each `.FCStd` file has its own independent todo tree; opening multiple documents gives you multiple independent lists.
+
+## Documentation
+
+Full command reference is in the [Documentation](Documentation/README.md) directory.
 
 ## How to install
 

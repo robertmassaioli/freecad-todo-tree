@@ -15,10 +15,11 @@ import FreeCAD
 import FreeCADGui
 
 from .tree_panel import TreePanel
+from .debug import log as _log_raw
 
 
 def _log(msg):
-    FreeCAD.Console.PrintMessage(f"TodoTree [dock] {msg}\n")
+    _log_raw(f"[dock] {msg}")
 
 _dock_instance = None
 _observer = None

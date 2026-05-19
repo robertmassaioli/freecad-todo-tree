@@ -3,7 +3,7 @@
 
 """QSortFilterProxyModel that hides done nodes (and their entire subtrees)."""
 
-from PySide.QtCore import Qt, QSortFilterProxyModel
+from PySide.QtCore import Qt, QSortFilterProxyModel, QModelIndex
 from .debug import log
 
 
@@ -29,6 +29,28 @@ class DoneFilterProxy(QSortFilterProxyModel):
     def setData(self, index, value, role=Qt.EditRole):
         log(f"proxy.setData: role={role!r} value={value!r}")
         return super().setData(index, value, role)
+
+    def supportedDropActions(self):
+        return self.sourceModel().supportedDropActions()
+
+    def dropMimeData(self, data, action, row, column, proxy_parent):
+        if proxy_parent.isValid():
+            src_parent = self.mapToSource(proxy_parent)
+        else:
+            src_parent = QModelIndex()
+
+        if row == -1:
+            src_row = -1
+        elif proxy_parent.isValid():
+            if row < self.rowCount(proxy_parent):
+                src_row_idx = self.mapToSource(self.index(row, 0, proxy_parent))
+                src_row = src_row_idx.row()
+            else:
+                src_row = self.sourceModel().rowCount(src_parent)
+        else:
+            src_row = row
+
+        return self.sourceModel().dropMimeData(data, action, src_row, column, src_parent)
 
     def filterAcceptsRow(self, source_row, source_parent):
         if self._show_done:

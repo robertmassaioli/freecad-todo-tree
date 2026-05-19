@@ -19,6 +19,31 @@ def _get_dock_panel():
     return dock.panel if dock else None
 
 
+def _ensure_dock_panel():
+    """Return the dock panel, creating the TodoTree object first if needed.
+
+    Used by commands that add content — they should work even when the dock
+    is showing the 'No todo items yet' placeholder.
+    """
+    from .dock_widget import get_dock
+    from .tree_panel import TreePanel
+    dock = get_dock()
+    if dock is None:
+        return None
+    if dock.panel is not None:
+        return dock.panel
+    doc = _active_doc()
+    if doc is None:
+        return None
+    from .model_registry import ensure_model
+    model = ensure_model(doc)
+    fc_obj = model._fc_object
+    panel = TreePanel(model, fc_obj, is_primary=True, parent=dock)
+    dock.setWidget(panel)
+    dock._panel = panel
+    return panel
+
+
 class _ShowDockCommand:
     def GetResources(self):
         return {
@@ -65,7 +90,7 @@ class _AddItemCommand:
         }
 
     def Activated(self):
-        panel = _get_dock_panel()
+        panel = _ensure_dock_panel()
         if panel:
             panel.add_item()
 
@@ -82,7 +107,7 @@ class _AddChildCommand:
         }
 
     def Activated(self):
-        panel = _get_dock_panel()
+        panel = _ensure_dock_panel()
         if panel:
             panel.add_child_item()
 

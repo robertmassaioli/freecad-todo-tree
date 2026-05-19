@@ -1,0 +1,68 @@
+<?xml
+    version = '1.0'
+    encoding = 'UTF-8'
+    standalone = 'no'
+?>
+<package
+    format = '1'
+    xmlns = 'https://wiki.freecad.org/Package_Metadata'
+>
+
+    <!--[ Versions ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <freecadmin>1.0.2</freecadmin>
+    <version>0.1.0</version>
+    <date>2026-05-18</date>
+
+    <!--[ Info ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <description>Hierarchical todo list workbench for FreeCAD documents. Organise tasks in a tree structure, navigate by zooming into subtrees, and save todo state with your .FCStd file.</description>
+    <name>TodoTree</name>
+
+    <!--[ Tags ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <tag>Todo</tag>
+    <tag>Tasks</tag>
+    <tag>Notes</tag>
+    <tag>Productivity</tag>
+
+    <!--[ Maintainers ]――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <maintainer
+        email = 'robertmassaioli@gmail.com'
+    >Robert Massaioli</maintainer>
+
+    <!--[ Authors ]――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <author
+        email = 'robertmassaioli@gmail.com'
+    >Robert Massaioli</author>
+
+    <!--[ Licenses ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <license
+        file = 'LICENSE'
+    >LGPL-2.1-or-later</license>
+
+    <!--[ Icon ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <icon>freecad/TodoTree/Resources/Icons/Logo.svg</icon>
+
+    <!--[ Urls ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <url
+        branch = 'main'
+        type = 'repository'
+    >https://github.com/robertmassaioli/freecad-todo-tree</url>
+
+    <url
+        type = 'bugtracker'
+    >https://github.com/robertmassaioli/freecad-todo-tree/issues</url>
+
+    <!--[ Content ]――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <content>
+        <workbench/>
+    </content>
+
+</package>

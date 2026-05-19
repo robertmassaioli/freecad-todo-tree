@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Checkbox rows representing a todo list -->
+  <rect x="4" y="8" width="14" height="14" rx="2" fill="none" stroke="#4a90d9" stroke-width="3"/>
+  <polyline points="7,15 11,19 18,11" fill="none" stroke="#4a90d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="24" y1="15" x2="60" y2="15" stroke="#4a90d9" stroke-width="3" stroke-linecap="round"/>
+
+  <rect x="4" y="28" width="14" height="14" rx="2" fill="none" stroke="#888" stroke-width="3"/>
+  <line x1="24" y1="35" x2="50" y2="35" stroke="#888" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Indented child row -->
+  <rect x="16" y="46" width="12" height="12" rx="2" fill="none" stroke="#888" stroke-width="2.5"/>
+  <line x1="34" y1="52" x2="56" y2="52" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Indent line -->
+  <polyline points="10,40 10,52 16,52" fill="none" stroke="#bbb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

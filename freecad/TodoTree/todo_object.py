@@ -64,6 +64,13 @@ class ViewProviderTodoTree:
     def __init__(self, vobj):
         vobj.Proxy = self
 
+    def onDocumentRestored(self, vobj):
+        # Re-attach the proxy after document restore. Without this, FreeCAD's
+        # ViewProviderFeaturePythonImp::finishRestoring() detects a None proxy
+        # and replaces it with the integer sentinel 1, making py_getIcon and
+        # py_doubleClicked permanently None and breaking the icon and double-click.
+        vobj.Proxy = self
+
     def getIcon(self):
         return as_icon("Logo")
 

@@ -194,6 +194,69 @@ class TodoItemModel(QAbstractItemModel):
         doc.commitTransaction()
         self.endRemoveRows()
 
+    def outdent_node(self, index):
+        """
+        Move node up one level using beginMoveRows so views update without a full reset.
+        The caller must have already verified that the operation is permitted.
+        """
+        if not index.isValid():
+            return
+        node = index.internalPointer()
+        parent = node._parent
+        if parent is None or parent is self._tree.root:
+            return
+
+        grandparent = parent._parent  # None means grandparent IS root
+        if grandparent is None:
+            grandparent = self._tree.root
+
+        row_n = parent.children.index(node)
+        row_p = grandparent.children.index(parent)
+        dest_row = row_p + 1
+
+        parent_idx = self.index_for_node(parent.id)
+        gp_idx = (QModelIndex() if grandparent is self._tree.root
+                  else self.index_for_node(grandparent.id))
+
+        doc = self._fc_object.Document
+        doc.openTransaction("Todo: outdent item")
+        self.beginMoveRows(parent_idx, row_n, row_n, gp_idx, dest_row)
+        self._tree.outdent_node(node.id)
+        self._flush_to_property()
+        doc.commitTransaction()
+        self.endMoveRows()
+
+    def indent_node(self, index):
+        """
+        Move node down one level (under previous sibling) using beginMoveRows.
+        The caller must have already verified that the operation is permitted.
+        """
+        if not index.isValid():
+            return
+        node = index.internalPointer()
+        parent = node._parent
+        if parent is None:
+            parent = self._tree.root
+
+        row_n = parent.children.index(node)
+        if row_n == 0:
+            return
+
+        prev_sibling = parent.children[row_n - 1]
+        dest_row = len(prev_sibling.children)  # append position, before the move
+
+        source_parent_idx = (QModelIndex() if parent is self._tree.root
+                             else self.index_for_node(parent.id))
+        dest_parent_idx = self.index_for_node(prev_sibling.id)
+
+        doc = self._fc_object.Document
+        doc.openTransaction("Todo: indent item")
+        self.beginMoveRows(source_parent_idx, row_n, row_n, dest_parent_idx, dest_row)
+        self._tree.indent_node(node.id)
+        self._flush_to_property()
+        doc.commitTransaction()
+        self.endMoveRows()
+
     # ── navigation helper ──────────────────────────────────────────────────
 
     def index_for_node(self, node_id):

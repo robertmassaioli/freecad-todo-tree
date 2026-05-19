@@ -142,6 +142,40 @@ class _ToggleShowDoneCommand:
         return _active_doc() is not None
 
 
+class _OutdentItemCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": as_icon("Outdent"),
+            "MenuText": "Outdent Todo Item",
+            "ToolTip": "Raise this item one level in the hierarchy",
+        }
+
+    def Activated(self):
+        panel = _get_dock_panel()
+        if panel:
+            panel.outdent_item()
+
+    def IsActive(self):
+        return _active_doc() is not None
+
+
+class _IndentItemCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": as_icon("Indent"),
+            "MenuText": "Indent Todo Item",
+            "ToolTip": "Lower this item one level under its previous sibling",
+        }
+
+    def Activated(self):
+        panel = _get_dock_panel()
+        if panel:
+            panel.indent_item()
+
+    def IsActive(self):
+        return _active_doc() is not None
+
+
 def register_commands():
     FreeCADGui.addCommand("TodoTree_ShowDock", _ShowDockCommand())
     FreeCADGui.addCommand("TodoTree_OpenMainView", _OpenMainViewCommand())
@@ -150,3 +184,5 @@ def register_commands():
     FreeCADGui.addCommand("TodoTree_DeleteItem", _DeleteItemCommand())
     FreeCADGui.addCommand("TodoTree_NavigateInto", _NavigateIntoCommand())
     FreeCADGui.addCommand("TodoTree_ToggleShowDone", _ToggleShowDoneCommand())
+    FreeCADGui.addCommand("TodoTree_OutdentItem", _OutdentItemCommand())
+    FreeCADGui.addCommand("TodoTree_IndentItem", _IndentItemCommand())

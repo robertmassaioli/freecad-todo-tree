@@ -114,6 +114,52 @@ class TodoTree:
     def set_done(self, node_id, done):
         self._id_map[node_id].done = done
 
+    def outdent_node(self, node_id):
+        """
+        Raise node one level: remove from parent, insert after parent in grandparent.
+        Returns False if already a direct child of root (cannot go higher).
+        Children travel with the node unchanged.
+        """
+        node = self._id_map.get(node_id)
+        if node is None:
+            return False
+        parent = node._parent
+        if parent is None or parent is self.root:
+            return False
+        grandparent = parent._parent  # may be self.root (its _parent is None)
+        if grandparent is None:
+            grandparent = self.root
+
+        parent.children.remove(node)
+        insert_pos = grandparent.children.index(parent) + 1
+        grandparent.children.insert(insert_pos, node)
+        node._parent = grandparent
+        return True
+
+    def indent_node(self, node_id):
+        """
+        Lower node one level: append to the children of its previous sibling.
+        Returns False if the node is the first child of its parent (no previous sibling).
+        Children travel with the node unchanged.
+        """
+        node = self._id_map.get(node_id)
+        if node is None:
+            return False
+        parent = node._parent
+        if parent is None:
+            parent = self.root
+
+        siblings = parent.children
+        idx = siblings.index(node)
+        if idx == 0:
+            return False
+
+        new_parent = siblings[idx - 1]
+        siblings.remove(node)
+        new_parent.children.append(node)
+        node._parent = new_parent
+        return True
+
     def _purge_ids(self, node):
         del self._id_map[node.id]
         for child in node.children:

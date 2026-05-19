@@ -158,7 +158,7 @@ class _ToggleShowDoneCommand:
             "Checkable": True,
         }
 
-    def Activated(self):
+    def Activated(self, checked=False):
         panel = _get_dock_panel()
         if panel:
             panel.toggle_show_done()

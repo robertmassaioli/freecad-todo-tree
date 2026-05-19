@@ -28,6 +28,8 @@ class TodoTreeWorkbench(Gui.Workbench):
             "TodoTree_AddItem",
             "TodoTree_AddChild",
             "TodoTree_DeleteItem",
+            "TodoTree_OutdentItem",
+            "TodoTree_IndentItem",
             "TodoTree_NavigateInto",
             "TodoTree_ToggleShowDone",
         ]

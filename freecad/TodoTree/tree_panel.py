@@ -20,7 +20,7 @@ from PySide.QtWidgets import (
     QWidget, QVBoxLayout, QToolBar, QTreeView,
     QAbstractItemView, QSizePolicy, QMenu,
 )
-from PySide.QtGui import QAction, QKeySequence
+from PySide.QtGui import QAction, QKeySequence, QShortcut
 from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
 import FreeCAD as _fc
 
@@ -94,6 +94,20 @@ class TreePanel(QWidget):
 
         tb.addSeparator()
 
+        self._act_outdent = QAction("← Outdent", self)
+        self._act_outdent.setToolTip("Raise this item one level (Shift+Tab)")
+        self._act_outdent.setEnabled(False)
+        self._act_outdent.triggered.connect(self._outdent_selected)
+        tb.addAction(self._act_outdent)
+
+        self._act_indent = QAction("→ Indent", self)
+        self._act_indent.setToolTip("Lower this item one level under its previous sibling (Tab)")
+        self._act_indent.setEnabled(False)
+        self._act_indent.triggered.connect(self._indent_selected)
+        tb.addAction(self._act_indent)
+
+        tb.addSeparator()
+
         self._act_nav_into = QAction("Go Into", self)
         self._act_nav_into.setToolTip("Make the selected item the root of the view")
         self._act_nav_into.triggered.connect(self._navigate_into_selected)
@@ -127,6 +141,21 @@ class TreePanel(QWidget):
         self._tree_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._click_logger = _ClickLogger(self)
         self._tree_view.viewport().installEventFilter(self._click_logger)
+
+        # Update indent/outdent button state when selection changes.
+        self._tree_view.selectionModel().currentChanged.connect(
+            self._update_indent_actions
+        )
+
+        # Tab / Shift+Tab keyboard shortcuts, scoped to the tree view.
+        sc_indent = QShortcut(QKeySequence(Qt.Key_Tab), self._tree_view)
+        sc_indent.setContext(Qt.WidgetShortcut)
+        sc_indent.activated.connect(self._indent_selected)
+
+        sc_outdent = QShortcut(QKeySequence(Qt.Key_Backtab), self._tree_view)
+        sc_outdent.setContext(Qt.WidgetShortcut)
+        sc_outdent.activated.connect(self._outdent_selected)
+
         layout.addWidget(self._tree_view)
 
     # ── view state persistence ─────────────────────────────────────────────
@@ -315,6 +344,58 @@ class TreePanel(QWidget):
         self._proxy.set_show_done(checked)
         self._save_view_state()
 
+    # ── indent / outdent ───────────────────────────────────────────────────
+
+    def _can_outdent(self, src_idx):
+        """True if the node can be raised one level given the current view root."""
+        if not src_idx.isValid():
+            return False
+        node = src_idx.internalPointer()
+        parent = node._parent
+        if parent is None or parent is self._model._tree.root:
+            return False  # already at top level
+        # Blocked if parent IS the current view root — would escape the subtree.
+        view_root_id = self._breadcrumb_path[-1]
+        return parent.id != view_root_id
+
+    def _can_indent(self, src_idx):
+        """True if the node has a previous sibling it can move under."""
+        if not src_idx.isValid():
+            return False
+        node = src_idx.internalPointer()
+        parent = node._parent if node._parent else self._model._tree.root
+        return parent.children.index(node) > 0
+
+    def _update_indent_actions(self, current_proxy=None, _previous=None):
+        src_idx = self._current_source_index()
+        self._act_outdent.setEnabled(self._can_outdent(src_idx))
+        self._act_indent.setEnabled(self._can_indent(src_idx))
+
+    def _outdent_selected(self):
+        src_idx = self._current_source_index()
+        if self._can_outdent(src_idx):
+            self._model.outdent_node(src_idx)
+            # Re-select the moved node so the user can chain operations.
+            new_idx = self._model.index_for_node(
+                self._model.data(src_idx, Qt.UserRole)
+            )
+            if new_idx.isValid():
+                self._tree_view.setCurrentIndex(self._proxy.mapFromSource(new_idx))
+            self._update_indent_actions()
+
+    def _indent_selected(self):
+        src_idx = self._current_source_index()
+        if self._can_indent(src_idx):
+            node_id = self._model.data(src_idx, Qt.UserRole)
+            self._model.indent_node(src_idx)
+            new_idx = self._model.index_for_node(node_id)
+            if new_idx.isValid():
+                proxy_idx = self._proxy.mapFromSource(new_idx)
+                # Expand the new parent so the moved node is visible.
+                self._tree_view.setExpanded(self._proxy.parent(proxy_idx), True)
+                self._tree_view.setCurrentIndex(proxy_idx)
+            self._update_indent_actions()
+
     # ── context menu ───────────────────────────────────────────────────────
 
     def _context_menu(self, pos):
@@ -322,6 +403,9 @@ class TreePanel(QWidget):
         menu.addAction(self._act_add)
         menu.addAction(self._act_add_child)
         menu.addAction(self._act_delete)
+        menu.addSeparator()
+        menu.addAction(self._act_outdent)
+        menu.addAction(self._act_indent)
         menu.addSeparator()
         menu.addAction(self._act_nav_into)
         menu.addAction(self._act_nav_up)
@@ -374,3 +458,9 @@ class TreePanel(QWidget):
 
     def toggle_show_done(self):
         self._act_show_done.setChecked(not self._act_show_done.isChecked())
+
+    def outdent_item(self):
+        self._outdent_selected()
+
+    def indent_item(self):
+        self._indent_selected()

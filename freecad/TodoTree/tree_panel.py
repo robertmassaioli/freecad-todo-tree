@@ -21,7 +21,7 @@ from PySide.QtWidgets import (
     QAbstractItemView, QSizePolicy, QMenu, QApplication,
     QStyledItemDelegate,
 )
-from PySide.QtGui import QAction, QKeySequence, QShortcut
+from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen
 try:
     from PySide.QtGui import QDrag
 except ImportError:
@@ -39,18 +39,26 @@ HANDLE_WIDTH = 18
 
 class _DragHandleDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
-        super().paint(painter, option, index)
-        painter.save()
-        painter.setPen(Qt.gray)
+        import copy
         r = option.rect
-        cx = r.left() + 7
+        # Draw grip lines first in left HANDLE_WIDTH px.
+        painter.save()
+        pen = QPen(option.palette.mid().color())
+        pen.setWidth(1)
+        painter.setPen(pen)
+        cx = r.left() + 5
         cy = r.center().y()
         for dy in (-4, 0, 4):
             painter.drawLine(cx, cy + dy, cx + 6, cy + dy)
         painter.restore()
+        # Shift the rect so the base delegate's checkbox+text don't overlap the grip.
+        shifted = copy.copy(option)
+        shifted.rect = r.adjusted(HANDLE_WIDTH, 0, 0, 0)
+        super().paint(painter, shifted, index)
 
     def sizeHint(self, option, index):
-        return super().sizeHint(option, index)
+        hint = super().sizeHint(option, index)
+        return QSize(hint.width() + HANDLE_WIDTH, hint.height())
 
 
 class _DragInitFilter(QObject):

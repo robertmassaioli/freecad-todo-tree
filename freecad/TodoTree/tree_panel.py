@@ -147,7 +147,7 @@ class TreePanel(QWidget):
             self._update_indent_actions
         )
 
-        # Tab / Shift+Tab keyboard shortcuts, scoped to the tree view.
+        # Tab / Shift+Tab — indent / outdent (scoped to tree view).
         sc_indent = QShortcut(QKeySequence(Qt.Key_Tab), self._tree_view)
         sc_indent.setContext(Qt.WidgetShortcut)
         sc_indent.activated.connect(self._indent_selected)
@@ -155,6 +155,22 @@ class TreePanel(QWidget):
         sc_outdent = QShortcut(QKeySequence(Qt.Key_Backtab), self._tree_view)
         sc_outdent.setContext(Qt.WidgetShortcut)
         sc_outdent.activated.connect(self._outdent_selected)
+
+        # Enter / numpad Enter — Go Into (descend into selected item).
+        # Safe because edit triggers are DoubleClicked only, so Enter does
+        # not start inline editing.
+        sc_into = QShortcut(QKeySequence(Qt.Key_Return), self._tree_view)
+        sc_into.setContext(Qt.WidgetShortcut)
+        sc_into.activated.connect(self._navigate_into_selected)
+
+        sc_into_kp = QShortcut(QKeySequence(Qt.Key_Enter), self._tree_view)
+        sc_into_kp.setContext(Qt.WidgetShortcut)
+        sc_into_kp.activated.connect(self._navigate_into_selected)
+
+        # Backspace — Go Up (ascend one breadcrumb level).
+        sc_up = QShortcut(QKeySequence(Qt.Key_Backspace), self._tree_view)
+        sc_up.setContext(Qt.WidgetShortcut)
+        sc_up.activated.connect(self._navigate_up)
 
         layout.addWidget(self._tree_view)
 

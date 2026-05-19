@@ -113,6 +113,20 @@ Select an item and click **Delete**. This removes the item and all of its childr
 
 All structural changes (add, delete, rename, check/uncheck) integrate with FreeCAD's undo stack. Ctrl+Z and Ctrl+Y work as expected. Navigation changes (breadcrumb, expand/collapse) are not on the undo stack — they are view state, not data mutations.
 
+## Keyboard shortcuts
+
+These shortcuts are active when the Todo Tree panel has keyboard focus.
+
+| Shortcut | Action |
+|---|---|
+| **Enter** | Go Into — make the selected item the root of the view |
+| **Backspace** | Go Up — ascend one level in the breadcrumb |
+| **Tab** | Indent — move the selected item one level deeper (under its previous sibling) |
+| **Shift+Tab** | Outdent — move the selected item one level higher |
+| **Double-click** | Edit the selected item's label inline |
+
+Navigation commands (Go Into, Go Up) can also be assigned a global keyboard shortcut via **Tools → Customize → Keyboard** by searching for "Navigate Into" and "Navigate Up" in the Todo Tree group.
+
 ## How it works
 
 ### Data storage

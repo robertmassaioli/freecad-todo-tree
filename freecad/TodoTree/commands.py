@@ -176,6 +176,74 @@ class _IndentItemCommand:
         return _active_doc() is not None
 
 
+class _ClearAllCommand:
+    def GetResources(self):
+        return {
+            "Pixmap": as_icon("Delete"),
+            "MenuText": "Clear Todo List",
+            "ToolTip": (
+                "Remove all Todo Tree data from this document and start fresh. "
+                "Also removes any duplicate TodoTree objects left by earlier bugs."
+            ),
+        }
+
+    def Activated(self):
+        doc = _active_doc()
+        if not doc:
+            return
+
+        try:
+            from PySide.QtWidgets import QMessageBox
+            from PySide.QtCore import Qt
+        except ImportError:
+            from PySide2.QtWidgets import QMessageBox
+            from PySide2.QtCore import Qt
+
+        import FreeCADGui
+        mw = FreeCADGui.getMainWindow()
+        answer = QMessageBox.warning(
+            mw,
+            "Clear Todo List",
+            "This will permanently delete all todo items in this document.\n\n"
+            "This cannot be undone.\n\nAre you sure?",
+            QMessageBox.Ok | QMessageBox.Cancel,
+            QMessageBox.Cancel,
+        )
+        if answer != QMessageBox.Ok:
+            return
+
+        # Find every object with our two distinctive properties and remove them all.
+        # This handles both the normal case and documents with duplicate objects
+        # left by earlier versions of the addon.
+        to_remove = [
+            obj.Name for obj in doc.Objects
+            if "TreeData" in getattr(obj, "PropertiesList", [])
+            and "ViewState" in getattr(obj, "PropertiesList", [])
+        ]
+
+        if not to_remove:
+            return
+
+        doc.openTransaction("Todo: clear todo list")
+        for name in to_remove:
+            doc.removeObject(name)
+        doc.commitTransaction()
+        doc.recompute()
+
+        # Purge the stale model so the dock rebuilds cleanly.
+        from .model_registry import invalidate_model
+        invalidate_model(doc.Name)
+
+        # Tell the dock to refresh; ensure_model will create a new empty object.
+        from .dock_widget import get_dock
+        dock = get_dock()
+        if dock:
+            dock.switch_to_document(doc)
+
+    def IsActive(self):
+        return _active_doc() is not None
+
+
 def register_commands():
     FreeCADGui.addCommand("TodoTree_ShowDock", _ShowDockCommand())
     FreeCADGui.addCommand("TodoTree_OpenMainView", _OpenMainViewCommand())
@@ -186,3 +254,4 @@ def register_commands():
     FreeCADGui.addCommand("TodoTree_ToggleShowDone", _ToggleShowDoneCommand())
     FreeCADGui.addCommand("TodoTree_OutdentItem", _OutdentItemCommand())
     FreeCADGui.addCommand("TodoTree_IndentItem", _IndentItemCommand())
+    FreeCADGui.addCommand("TodoTree_ClearAll", _ClearAllCommand())

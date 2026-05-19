@@ -35,6 +35,8 @@ class TodoTreeWorkbench(Gui.Workbench):
         ]
         self.appendToolbar("Todo Tree", toolbar_cmds)
         self.appendMenu("Todo Tree", toolbar_cmds)
+        # Destructive command in its own group at the bottom of the menu.
+        self.appendMenu("Todo Tree", ["Separator", "TodoTree_ClearAll"])
 
     def Activated(self):
         from .dock_widget import show_dock

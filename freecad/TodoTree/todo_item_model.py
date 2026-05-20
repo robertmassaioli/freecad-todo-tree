@@ -3,7 +3,7 @@
 
 """QAbstractItemModel wrapping TodoTree. Shared between dock and main view."""
 
-from PySide.QtCore import Qt, Signal, QAbstractItemModel, QModelIndex
+from PySide.QtCore import Qt, Signal, QAbstractItemModel, QModelIndex, QMimeData
 from PySide.QtGui import QColor, QFont
 
 from .todo_model import TodoTree
@@ -91,7 +91,6 @@ class TodoItemModel(QAbstractItemModel):
         if role in (Qt.DisplayRole, Qt.EditRole):
             return node.text
         if role == Qt.CheckStateRole:
-            log(f"data(CheckStateRole): node={node.text!r} done={node.done!r}")
             # Return plain integers so Qt6's C++ delegate can call toInt() correctly.
             # Returning a Python enum causes Qt6 to always read the state as 0 (Unchecked),
             # making unchecking impossible (it always re-checks the item).
@@ -108,9 +107,7 @@ class TodoItemModel(QAbstractItemModel):
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
-        log(f"setData: role={role!r} value={value!r}")
         if not index.isValid():
-            log("setData: index invalid, returning False")
             return False
         node = index.internalPointer()
         doc = self._fc_object.Document
@@ -130,9 +127,7 @@ class TodoItemModel(QAbstractItemModel):
             # value may be a Python enum or a plain int depending on what called setData.
             # bool() works for both: 0/Unchecked → False, 2/Checked → True.
             done = bool(value)
-            log(f"setData CheckStateRole: value={value!r} done={done!r} node.done={node.done!r}")
             if done == node.done:
-                log("setData CheckStateRole: no change, returning False")
                 return False
             doc.openTransaction("Todo: toggle done")
             self._tree.set_done(node.id, done)
@@ -145,10 +140,110 @@ class TodoItemModel(QAbstractItemModel):
 
     def flags(self, index):
         if not index.isValid():
-            return Qt.NoItemFlags
-        f = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsUserCheckable
-        log(f"flags: {f!r}")
-        return f
+            return Qt.ItemIsDropEnabled
+        return (Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
+                | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled)
+
+    def supportedDropActions(self):
+        return Qt.MoveAction
+
+    def mimeTypes(self):
+        return ["application/x-todotree-node"]
+
+    def mimeData(self, indexes):
+        valid = [i for i in indexes if i.isValid()]
+        if not valid:
+            return None
+        node = valid[0].internalPointer()
+        log(f"DRAG start: '{node.text}'")
+        mime = QMimeData()
+        mime.setData("application/x-todotree-node",
+                     json.dumps({"id": node.id}).encode("utf-8"))
+        return mime
+
+    def dropMimeData(self, data, action, row, column, parent):
+        if not data.hasFormat("application/x-todotree-node"):
+            return False
+        try:
+            payload = json.loads(bytes(data.data("application/x-todotree-node")).decode("utf-8"))
+            node_id = payload["id"]
+        except (ValueError, KeyError):
+            log("DROP rejected: could not decode MIME payload")
+            return False
+
+        node = self._tree.get_node(node_id)
+        if node is None:
+            log("DROP rejected: dragged node no longer exists")
+            return False
+
+        # Determine destination parent node and insert_row.
+        if parent.isValid():
+            dest_parent_node = parent.internalPointer()
+        else:
+            dest_parent_node = self._tree.root
+
+        if row == -1:
+            # Drop onto an item — append as last child.
+            insert_row = len(dest_parent_node.children)
+            drop_desc = f"onto '{dest_parent_node.text}' (as last child, position {insert_row})"
+        else:
+            insert_row = row
+            dest_parent_label = "root" if dest_parent_node is self._tree.root else f"'{dest_parent_node.text}'"
+            siblings = dest_parent_node.children
+            before = f"before '{siblings[insert_row].text}'" if insert_row < len(siblings) else "at end"
+            drop_desc = f"under {dest_parent_label}, {before} (position {insert_row})"
+
+        # Guard: cannot move a node into itself or its descendants.
+        cur = dest_parent_node
+        while cur is not None:
+            if cur is node:
+                log(f"DROP rejected: cannot move '{node.text}' into its own subtree")
+                return False
+            cur = cur._parent
+
+        old_parent_node = node._parent if node._parent else self._tree.root
+        src_row = old_parent_node.children.index(node)
+        old_parent_label = "root" if old_parent_node is self._tree.root else f"'{old_parent_node.text}'"
+
+        log(f"DROP '{node.text}': from {old_parent_label}[{src_row}] → {drop_desc}")
+
+        old_parent_idx = (QModelIndex() if old_parent_node is self._tree.root
+                          else self.index_for_node(old_parent_node.id))
+        dest_parent_idx = (QModelIndex() if dest_parent_node is self._tree.root
+                           else self.index_for_node(dest_parent_node.id))
+
+        # beginMoveRows uses pre-removal coordinates; move_node uses post-removal.
+        # For a same-parent downward move the forbidden range [src_row, src_row+1]
+        # only occurs at insert_row == src_row+1, which is a visual no-op.
+        # For all real downward moves: bm_dest = insert_row, effective = insert_row - 1.
+        same_parent = (old_parent_node is dest_parent_node)
+        if same_parent and src_row < insert_row:
+            if insert_row <= src_row + 1:
+                log(f"DROP '{node.text}': no-op (dropped back onto its own position)")
+                return True
+            bm_dest = insert_row
+            effective_insert_row = insert_row - 1
+        else:
+            bm_dest = insert_row
+            effective_insert_row = insert_row
+
+        doc = self._fc_object.Document
+        doc.openTransaction("Todo: move item")
+        ok = self.beginMoveRows(old_parent_idx, src_row, src_row, dest_parent_idx, bm_dest)
+        if not ok:
+            log(f"DROP '{node.text}': beginMoveRows rejected (src={src_row} bm_dest={bm_dest})")
+            doc.abortTransaction()
+            return False
+        moved = self._tree.move_node(node_id, dest_parent_node.id, effective_insert_row)
+        if not moved:
+            log(f"DROP '{node.text}': move_node rejected")
+            self.endMoveRows()
+            doc.abortTransaction()
+            return False
+        self._flush_to_property()
+        doc.commitTransaction()
+        self.endMoveRows()
+        return True
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:

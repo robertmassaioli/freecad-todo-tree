@@ -160,6 +160,27 @@ class TodoTree:
         node._parent = new_parent
         return True
 
+    def move_node(self, node_id, new_parent_id, insert_row):
+        """
+        Move node_id to be the insert_row-th child of new_parent_id.
+        Returns False if the move is invalid (unknown IDs or circular).
+        """
+        node = self._id_map.get(node_id)
+        new_parent = self._id_map.get(new_parent_id)
+        if node is None or new_parent is None:
+            return False
+        cur = new_parent
+        while cur is not None:
+            if cur is node:
+                return False
+            cur = cur._parent
+        old_parent = node._parent if node._parent else self.root
+        old_parent.children.remove(node)
+        insert_row = max(0, min(insert_row, len(new_parent.children)))
+        new_parent.children.insert(insert_row, node)
+        node._parent = new_parent
+        return True
+
     def _purge_ids(self, node):
         del self._id_map[node.id]
         for child in node.children:

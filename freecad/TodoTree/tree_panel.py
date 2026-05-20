@@ -18,9 +18,14 @@ import json
 
 from PySide.QtWidgets import (
     QWidget, QVBoxLayout, QToolBar, QTreeView,
-    QAbstractItemView, QSizePolicy, QMenu,
+    QAbstractItemView, QSizePolicy, QMenu, QApplication,
+    QStyledItemDelegate,
 )
-from PySide.QtGui import QAction, QKeySequence, QShortcut
+from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen
+try:
+    from PySide.QtGui import QDrag
+except ImportError:
+    from PySide.QtWidgets import QDrag
 from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
 import FreeCAD as _fc
 
@@ -29,13 +34,83 @@ from .debug import log
 from .filter_proxy import DoneFilterProxy
 
 
-class _ClickLogger(QObject):
-    """Event filter that logs mouse presses on the tree view viewport (debug only)."""
+HANDLE_WIDTH = 18
+
+
+class _DragHandleDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        import copy
+        r = option.rect
+        # Draw grip lines first in left HANDLE_WIDTH px.
+        painter.save()
+        pen = QPen(option.palette.mid().color())
+        pen.setWidth(1)
+        painter.setPen(pen)
+        cx = r.left() + 5
+        cy = r.center().y()
+        for dy in (-4, 0, 4):
+            painter.drawLine(cx, cy + dy, cx + 6, cy + dy)
+        painter.restore()
+        # Shift the rect so the base delegate's checkbox+text don't overlap the grip.
+        shifted = copy.copy(option)
+        shifted.rect = r.adjusted(HANDLE_WIDTH, 0, 0, 0)
+        super().paint(painter, shifted, index)
+
+    def sizeHint(self, option, index):
+        hint = super().sizeHint(option, index)
+        return QSize(hint.width() + HANDLE_WIDTH, hint.height())
+
+
+class _DragInitFilter(QObject):
+    def __init__(self, view, parent=None):
+        super().__init__(parent)
+        self._view = view
+        self._drag_from_handle = False
+        self._drag_start_pos = None
+
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress:
-            from .debug import log
-            log(f"viewport click: pos={event.pos().x()},{event.pos().y()} button={event.button()!r}")
-        return False  # don't consume the event
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            idx = self._view.indexAt(event.pos())
+            if idx.isValid():
+                vis_rect = self._view.visualRect(idx)
+                local_x = event.x() - vis_rect.left()
+                if local_x < HANDLE_WIDTH:
+                    self._drag_from_handle = True
+                    self._drag_start_pos = event.pos()
+                else:
+                    self._drag_from_handle = False
+            else:
+                self._drag_from_handle = False
+            return False
+
+        if event.type() == QEvent.MouseMove and event.buttons() & Qt.LeftButton:
+            if self._drag_from_handle and self._drag_start_pos is not None:
+                dist = (event.pos() - self._drag_start_pos).manhattanLength()
+                if dist > QApplication.startDragDistance():
+                    index = self._view.indexAt(self._drag_start_pos)
+                    if index.isValid():
+                        mime = self._view.model().mimeData([index])
+                        if mime:
+                            drag = QDrag(self._view)
+                            drag.setMimeData(mime)
+                            self._drag_from_handle = False
+                            result = drag.exec_(Qt.MoveAction)
+                            if result == 0:
+                                log("DRAG completed: drop was not accepted by target")
+                            return True
+                    self._drag_from_handle = False
+            return False
+
+        if event.type() == QEvent.MouseButtonRelease:
+            self._drag_from_handle = False
+            return False
+
+        return False
+
+
+class _ClickLogger(QObject):
+    def eventFilter(self, obj, event):
+        return False
 
 
 class TreePanel(QWidget):
@@ -132,15 +207,21 @@ class TreePanel(QWidget):
         self._tree_view = QTreeView(self)
         self._tree_view.setModel(self._proxy)
         self._tree_view.setHeaderHidden(True)
-        trigger = QAbstractItemView.DoubleClicked
-        log(f"QAbstractItemView.DoubleClicked = {trigger!r}")
         self._tree_view.setEditTriggers(QAbstractItemView.DoubleClicked)
         self._tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
         self._tree_view.customContextMenuRequested.connect(self._context_menu)
         self._tree_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tree_view.setAcceptDrops(True)
+        self._tree_view.setDropIndicatorShown(True)
+        self._tree_view.setDragDropMode(QAbstractItemView.DragDrop)
+        self._tree_view.setDefaultDropAction(Qt.MoveAction)
+        delegate = _DragHandleDelegate(self._tree_view)
+        self._tree_view.setItemDelegate(delegate)
         self._click_logger = _ClickLogger(self)
         self._tree_view.viewport().installEventFilter(self._click_logger)
+        self._drag_filter = _DragInitFilter(self._tree_view, self._tree_view)
+        self._tree_view.viewport().installEventFilter(self._drag_filter)
 
         # Update indent/outdent button state when selection changes.
         self._tree_view.selectionModel().currentChanged.connect(

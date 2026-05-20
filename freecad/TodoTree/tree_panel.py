@@ -282,6 +282,14 @@ class TreePanel(QWidget):
         sc_up.setContext(Qt.WidgetShortcut)
         sc_up.activated.connect(self._navigate_up)
 
+        # Space — toggle done state on the selected item.
+        # Explicit WidgetShortcut so FreeCAD's window-level Space binding
+        # (normally "Fit All" in the 3D view) cannot steal the key while the
+        # tree panel has focus.
+        sc_space = QShortcut(QKeySequence(Qt.Key_Space), self._tree_view)
+        sc_space.setContext(Qt.WidgetShortcut)
+        sc_space.activated.connect(self._toggle_done_selected)
+
         layout.addWidget(self._tree_view)
 
     # ── view state persistence ─────────────────────────────────────────────
@@ -453,6 +461,13 @@ class TreePanel(QWidget):
             proxy_idx = self._proxy.mapFromSource(src_idx)
             self._tree_view.setCurrentIndex(proxy_idx)
             self._tree_view.edit(proxy_idx)
+
+    def _toggle_done_selected(self):
+        src_idx = self._current_source_index()
+        if src_idx.isValid():
+            current = self._model.data(src_idx, Qt.CheckStateRole)
+            new_state = 0 if current == 2 else 2
+            self._model.setData(src_idx, new_state, Qt.CheckStateRole)
 
     def _delete_selected(self):
         src_idx = self._current_source_index()

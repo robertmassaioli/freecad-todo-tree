@@ -30,7 +30,7 @@ from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
 import FreeCAD as _fc
 
 from .breadcrumb_widget import BreadcrumbWidget
-from .debug import log
+from .debug import log, Category
 from .filter_proxy import DoneFilterProxy
 
 
@@ -96,7 +96,7 @@ class _DragInitFilter(QObject):
                             self._drag_from_handle = False
                             result = drag.exec_(Qt.MoveAction)
                             if result == 0:
-                                log("DRAG completed: drop was not accepted by target")
+                                log(Category.DRAG_DROP, "DRAG completed: drop was not accepted by target")
                             return True
                     self._drag_from_handle = False
             return False

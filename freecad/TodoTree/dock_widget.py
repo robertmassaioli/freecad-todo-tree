@@ -15,11 +15,11 @@ import FreeCAD
 import FreeCADGui
 
 from .tree_panel import TreePanel
-from .debug import log as _log_raw
+from .debug import log as _log_raw, Category
 
 
 def _log(msg):
-    _log_raw(f"[dock] {msg}")
+    _log_raw(Category.DOCUMENT, msg)
 
 _dock_instance = None
 _observer = None

@@ -7,7 +7,7 @@ from PySide.QtCore import Qt, Signal, QAbstractItemModel, QModelIndex, QMimeData
 from PySide.QtGui import QColor, QFont
 
 from .todo_model import TodoTree
-from .debug import log
+from .debug import log, Category
 import json
 
 
@@ -155,7 +155,7 @@ class TodoItemModel(QAbstractItemModel):
         if not valid:
             return None
         node = valid[0].internalPointer()
-        log(f"DRAG start: '{node.text}'")
+        log(Category.DRAG_DROP, f"DRAG start: '{node.text}'")
         mime = QMimeData()
         mime.setData("application/x-todotree-node",
                      json.dumps({"id": node.id}).encode("utf-8"))
@@ -168,12 +168,12 @@ class TodoItemModel(QAbstractItemModel):
             payload = json.loads(bytes(data.data("application/x-todotree-node")).decode("utf-8"))
             node_id = payload["id"]
         except (ValueError, KeyError):
-            log("DROP rejected: could not decode MIME payload")
+            log(Category.DRAG_DROP, "DROP rejected: could not decode MIME payload")
             return False
 
         node = self._tree.get_node(node_id)
         if node is None:
-            log("DROP rejected: dragged node no longer exists")
+            log(Category.DRAG_DROP, "DROP rejected: dragged node no longer exists")
             return False
 
         # Determine destination parent node and insert_row.
@@ -197,7 +197,7 @@ class TodoItemModel(QAbstractItemModel):
         cur = dest_parent_node
         while cur is not None:
             if cur is node:
-                log(f"DROP rejected: cannot move '{node.text}' into its own subtree")
+                log(Category.DRAG_DROP, f"DROP rejected: cannot move '{node.text}' into its own subtree")
                 return False
             cur = cur._parent
 
@@ -205,7 +205,7 @@ class TodoItemModel(QAbstractItemModel):
         src_row = old_parent_node.children.index(node)
         old_parent_label = "root" if old_parent_node is self._tree.root else f"'{old_parent_node.text}'"
 
-        log(f"DROP '{node.text}': from {old_parent_label}[{src_row}] → {drop_desc}")
+        log(Category.DRAG_DROP, f"DROP '{node.text}': from {old_parent_label}[{src_row}] → {drop_desc}")
 
         old_parent_idx = (QModelIndex() if old_parent_node is self._tree.root
                           else self.index_for_node(old_parent_node.id))
@@ -219,7 +219,7 @@ class TodoItemModel(QAbstractItemModel):
         same_parent = (old_parent_node is dest_parent_node)
         if same_parent and src_row < insert_row:
             if insert_row <= src_row + 1:
-                log(f"DROP '{node.text}': no-op (dropped back onto its own position)")
+                log(Category.DRAG_DROP, f"DROP '{node.text}': no-op (dropped back onto its own position)")
                 return True
             bm_dest = insert_row
             effective_insert_row = insert_row - 1
@@ -231,12 +231,12 @@ class TodoItemModel(QAbstractItemModel):
         doc.openTransaction("Todo: move item")
         ok = self.beginMoveRows(old_parent_idx, src_row, src_row, dest_parent_idx, bm_dest)
         if not ok:
-            log(f"DROP '{node.text}': beginMoveRows rejected (src={src_row} bm_dest={bm_dest})")
+            log(Category.DRAG_DROP, f"DROP '{node.text}': beginMoveRows rejected (src={src_row} bm_dest={bm_dest})")
             doc.abortTransaction()
             return False
         moved = self._tree.move_node(node_id, dest_parent_node.id, effective_insert_row)
         if not moved:
-            log(f"DROP '{node.text}': move_node rejected")
+            log(Category.DRAG_DROP, f"DROP '{node.text}': move_node rejected")
             self.endMoveRows()
             doc.abortTransaction()
             return False

@@ -6,7 +6,7 @@
 import FreeCAD
 from .todo_model import EMPTY_TREE, EMPTY_VIEW_STATE, TodoTree
 from .resources import as_icon
-from .debug import log as _log_raw
+from .debug import log as _log_raw, Category
 import json
 
 
@@ -15,7 +15,7 @@ OBJECT_NAME = "TodoTree"
 
 
 def _log(msg):
-    _log_raw(f"[obj] {msg}")
+    _log_raw(Category.OBJECT, msg)
 
 
 class TodoTreeObject:

@@ -100,7 +100,7 @@ class TodoItemModel(QAbstractItemModel):
             return node.id
         if node.done:
             if role == Qt.ForegroundRole:
-                return QApplication.palette().color(QPalette.Disabled, QPalette.Text)
+                return QApplication.palette().color(QPalette.Active, QPalette.Dark)
             if role == Qt.FontRole:
                 f = QFont()
                 f.setStrikeOut(True)

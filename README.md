@@ -2,9 +2,13 @@
 
 A FreeCAD workbench that adds a hierarchical, per-document todo list to your `.FCStd` files. Organise tasks in a tree, navigate into subtrees, and pick up exactly where you left off every time you open the file.
 
-<img src='Resources/Media/Overview.png' />
+<img src='Resources/Media/Overview-light.png' />
 
-*Todo Tree panel open while working in the Part Design workbench.*
+*Light mode — Todo Tree dock panel open alongside a PartDesign document.*
+
+<img src='Resources/Media/Overview-dark.png' />
+
+*Dark mode — the same panel with FreeCAD's dark theme active.*
 
 ## What it is
 

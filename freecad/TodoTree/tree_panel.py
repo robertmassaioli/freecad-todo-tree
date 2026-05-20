@@ -127,6 +127,7 @@ class TreePanel(QWidget):
         self._fc_object = fc_object
         self._is_primary = is_primary  # primary panel writes ViewState on changes
         self._breadcrumb_path = ["root"]  # list of node IDs from root to current view root
+        self._restoring_expansion = False  # guard against feedback loops during restore
 
         self._proxy = DoneFilterProxy(self)
         self._proxy.setSourceModel(item_model)
@@ -270,7 +271,6 @@ class TreePanel(QWidget):
 
         show_done = state.get("show_done", True)
         breadcrumb_path = state.get("breadcrumb_path", ["root"])
-        expanded_ids = state.get("expanded_ids", [])
 
         # Validate path: truncate at first missing node.
         tree = self._model._tree
@@ -292,45 +292,39 @@ class TreePanel(QWidget):
 
         self._apply_root_index()
         self._update_breadcrumb_display()
-        self._restore_expanded(expanded_ids)
+        self._restore_expanded_from_model()
 
     def _save_view_state(self):
         """Write view state to the FreeCAD property outside any transaction."""
         if not self._is_primary:
             return
-        expanded_ids = self._collect_expanded_ids()
         state = {
             "current_root_id": self._breadcrumb_path[-1],
             "breadcrumb_path": self._breadcrumb_path,
-            "expanded_ids": expanded_ids,
             "show_done": self._act_show_done.isChecked(),
         }
         # No transaction — view state is intentionally outside the undo stack.
         self._fc_object.ViewState = json.dumps(state)
 
-    def _collect_expanded_ids(self):
-        ids = []
-        self._walk_expanded(QModelIndex(), ids)
-        return ids
-
-    def _walk_expanded(self, proxy_parent, ids):
-        for row in range(self._proxy.rowCount(proxy_parent)):
-            proxy_idx = self._proxy.index(row, 0, proxy_parent)
-            if self._tree_view.isExpanded(proxy_idx):
-                src_idx = self._proxy.mapToSource(proxy_idx)
-                node_id = self._model.data(src_idx, Qt.UserRole)
-                if node_id:
-                    ids.append(node_id)
-            self._walk_expanded(proxy_idx, ids)
-
-    def _restore_expanded(self, expanded_ids):
-        tree = self._model._tree
-        for node_id in expanded_ids:
-            if tree.get_node(node_id):
-                src_idx = self._model.index_for_node(node_id)
+    def _restore_expanded_from_model(self):
+        """Expand every node whose model expanded flag is True."""
+        self._restoring_expansion = True
+        try:
+            def _walk(node):
+                if node is self._model._tree.root:
+                    for child in node.children:
+                        _walk(child)
+                    return
+                src_idx = self._model.index_for_node(node.id)
                 if src_idx.isValid():
                     proxy_idx = self._proxy.mapFromSource(src_idx)
-                    self._tree_view.setExpanded(proxy_idx, True)
+                    if node.expanded:
+                        self._tree_view.setExpanded(proxy_idx, True)
+                for child in node.children:
+                    _walk(child)
+            _walk(self._model._tree.root)
+        finally:
+            self._restoring_expansion = False
 
     # ── navigation ─────────────────────────────────────────────────────────
 
@@ -442,8 +436,12 @@ class TreePanel(QWidget):
         if src_idx.isValid():
             self._model.remove_node(src_idx)
 
-    def _on_expansion_changed(self, _proxy_index):
-        self._save_view_state()
+    def _on_expansion_changed(self, proxy_index):
+        if self._restoring_expansion:
+            return
+        src_idx = self._proxy.mapToSource(proxy_index)
+        expanded = self._tree_view.isExpanded(proxy_index)
+        self._model.set_node_expanded(src_idx, expanded)
 
     def _toggle_show_done(self, checked):
         self._proxy.set_show_done(checked)
@@ -492,11 +490,18 @@ class TreePanel(QWidget):
         src_idx = self._current_source_index()
         if self._can_indent(src_idx):
             node_id = self._model.data(src_idx, Qt.UserRole)
+            # Mark the new parent (previous sibling) as expanded in the model
+            # before the indent flushes, so the expansion is captured in the
+            # same undo snapshot as the structural change.
+            node = src_idx.internalPointer()
+            parent = node._parent if node._parent else self._model._tree.root
+            row_n = parent.children.index(node)
+            prev_sibling_idx = self._model.index_for_node(parent.children[row_n - 1].id)
+            self._model.set_node_expanded(prev_sibling_idx, True)
             self._model.indent_node(src_idx)
             new_idx = self._model.index_for_node(node_id)
             if new_idx.isValid():
                 proxy_idx = self._proxy.mapFromSource(new_idx)
-                # Expand the new parent so the moved node is visible.
                 self._tree_view.setExpanded(self._proxy.parent(proxy_idx), True)
                 self._tree_view.setCurrentIndex(proxy_idx)
             self._update_indent_actions()
@@ -536,13 +541,7 @@ class TreePanel(QWidget):
 
         self._apply_root_index()
         self._update_breadcrumb_display()
-
-        # Re-expand nodes that still exist.
-        try:
-            state = json.loads(self._fc_object.ViewState)
-            self._restore_expanded(state.get("expanded_ids", []))
-        except (ValueError, AttributeError):
-            pass
+        self._restore_expanded_from_model()
 
     # ── public API for FreeCAD commands ───────────────────────────────────
 

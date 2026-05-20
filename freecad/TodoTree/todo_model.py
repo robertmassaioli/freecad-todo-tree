@@ -17,18 +17,18 @@ EMPTY_TREE = {
 EMPTY_VIEW_STATE = {
     "current_root_id": "root",
     "breadcrumb_path": ["root"],
-    "expanded_ids": [],
     "show_done": True,
 }
 
 
 class TodoNode:
-    __slots__ = ("id", "text", "done", "children", "_parent")
+    __slots__ = ("id", "text", "done", "expanded", "children", "_parent")
 
-    def __init__(self, node_id, text, done=False):
+    def __init__(self, node_id, text, done=False, expanded=False):
         self.id = node_id
         self.text = text
         self.done = done
+        self.expanded = expanded
         self.children = []
         self._parent = None
 
@@ -46,6 +46,7 @@ class TodoTree:
                 "id": n.id,
                 "text": n.text,
                 "done": n.done,
+                "expanded": n.expanded,
                 "children": [_node(c) for c in n.children],
             }
         return _node(self.root)
@@ -56,7 +57,7 @@ class TodoTree:
         tree._id_map = {}
 
         def _node(d, parent=None):
-            n = TodoNode(d["id"], d["text"], d.get("done", False))
+            n = TodoNode(d["id"], d["text"], d.get("done", False), d.get("expanded", False))
             n._parent = parent
             tree._id_map[n.id] = n
             n.children = [_node(c, n) for c in d.get("children", [])]
@@ -113,6 +114,11 @@ class TodoTree:
 
     def set_done(self, node_id, done):
         self._id_map[node_id].done = done
+
+    def set_expanded(self, node_id, expanded: bool):
+        node = self._id_map.get(node_id)
+        if node:
+            node.expanded = expanded
 
     def outdent_node(self, node_id):
         """

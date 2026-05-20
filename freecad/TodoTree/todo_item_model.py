@@ -4,7 +4,8 @@
 """QAbstractItemModel wrapping TodoTree. Shared between dock and main view."""
 
 from PySide.QtCore import Qt, Signal, QAbstractItemModel, QModelIndex, QMimeData
-from PySide.QtGui import QColor, QFont
+from PySide.QtGui import QFont, QPalette
+from PySide.QtWidgets import QApplication
 
 from .todo_model import TodoTree
 from .debug import log, Category
@@ -99,7 +100,7 @@ class TodoItemModel(QAbstractItemModel):
             return node.id
         if node.done:
             if role == Qt.ForegroundRole:
-                return QColor("gray")
+                return QApplication.palette().color(QPalette.Disabled, QPalette.Text)
             if role == Qt.FontRole:
                 f = QFont()
                 f.setStrikeOut(True)

@@ -47,7 +47,7 @@ def _ensure_dock_panel():
 class _ShowDockCommand:
     def GetResources(self):
         return {
-            "Pixmap": as_icon("Logo"),
+            "Pixmap": as_icon("ShowDock"),
             "MenuText": "Show Todo Panel",
             "ToolTip": "Show or raise the Todo Tree dock panel",
         }
@@ -63,7 +63,7 @@ class _ShowDockCommand:
 class _OpenMainViewCommand:
     def GetResources(self):
         return {
-            "Pixmap": as_icon("Logo"),
+            "Pixmap": as_icon("OpenMainView"),
             "MenuText": "Open Todo Tree View",
             "ToolTip": "Open the todo tree in the main window area",
         }

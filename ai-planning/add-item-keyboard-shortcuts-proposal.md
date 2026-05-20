@@ -68,8 +68,13 @@ spreadsheets across all platforms (Windows Explorer, file managers, many IDEs).
 - Works on all platforms (Insert is present on all standard keyboards including
   laptop keyboards via Fn combos).
 
-**Downside:** On compact/laptop keyboards, Insert requires a Fn key combination,
-which is slightly awkward for a frequently used action.
+**Downside:**
+- On compact/laptop keyboards, Insert requires a Fn key combination, which is
+  slightly awkward for a frequently used action.
+- **MacBook Pro has no Insert key at all.** The conventional macOS substitute
+  (Fn+Return) is already taken by Go Into. There is no reliable cross-generation
+  Mac equivalent that FreeCAD will see as `Key_Insert`. Option A is effectively
+  unusable on macOS.
 
 ---
 

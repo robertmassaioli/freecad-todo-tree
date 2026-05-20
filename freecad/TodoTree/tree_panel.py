@@ -56,6 +56,12 @@ class _DragHandleDelegate(QStyledItemDelegate):
         shifted.rect = r.adjusted(HANDLE_WIDTH, 0, 0, 0)
         super().paint(painter, shifted, index)
 
+    def editorEvent(self, event, model, option, index):
+        import copy
+        shifted = copy.copy(option)
+        shifted.rect = option.rect.adjusted(HANDLE_WIDTH, 0, 0, 0)
+        return super().editorEvent(event, model, shifted, index)
+
     def sizeHint(self, option, index):
         hint = super().sizeHint(option, index)
         return QSize(hint.width() + HANDLE_WIDTH, hint.height())

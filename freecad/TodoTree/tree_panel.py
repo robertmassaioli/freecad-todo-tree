@@ -21,12 +21,12 @@ from PySide.QtWidgets import (
     QAbstractItemView, QSizePolicy, QMenu, QApplication,
     QStyledItemDelegate,
 )
-from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen
+from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen, QPalette, QPainter
 try:
     from PySide.QtGui import QDrag
 except ImportError:
     from PySide.QtWidgets import QDrag
-from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
+from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent, QPoint
 import FreeCAD as _fc
 
 from .breadcrumb_widget import BreadcrumbWidget
@@ -35,6 +35,88 @@ from .filter_proxy import DoneFilterProxy
 
 
 HANDLE_WIDTH = 18
+
+# ── Color debug ────────────────────────────────────────────────────────────────
+# Set True to show a color swatch panel at the bottom of every TreePanel.
+# Each row previews a different palette colour applied to the grip handle and
+# checkbox outline so you can pick the right one visually, then turn this off.
+_SHOW_COLOR_SWATCHES = True
+
+_SWATCH_COLORS = [
+    # (label, QPalette group, QPalette role)
+    ("1  Mid",                    QPalette.Active,   QPalette.Mid),
+    ("2  Midlight",               QPalette.Active,   QPalette.Midlight),
+    ("3  Dark",                   QPalette.Active,   QPalette.Dark),
+    ("4  Shadow",                 QPalette.Active,   QPalette.Shadow),
+    ("5  WindowText",             QPalette.Active,   QPalette.WindowText),
+    ("6  Text",                   QPalette.Active,   QPalette.Text),
+    ("7  ButtonText",             QPalette.Active,   QPalette.ButtonText),
+    ("8  Disabled / WindowText",  QPalette.Disabled, QPalette.WindowText),
+    ("9  Disabled / Text",        QPalette.Disabled, QPalette.Text),
+    ("10 Highlight",              QPalette.Active,   QPalette.Highlight),
+]
+
+_ROW_H   = 26   # height of each swatch row in pixels
+_GRIP_X  =  30  # x-start of grip preview
+_BOX_X   =  70  # x-start of unchecked box preview
+_TICK_X  = 100  # x-start of checked box preview
+_LABEL_X = 135  # x-start of label text
+
+
+class _ColorSwatchWidget(QWidget):
+    """
+    Temporary visual-debug panel.  Shows each palette colour in _SWATCH_COLORS
+    applied to both the grip handle (three lines) and a checkbox outline
+    (empty + ticked), labelled by number so you can refer to them by number
+    when asking for the final colour to use.
+    """
+
+    def minimumSizeHint(self):
+        return QSize(300, len(_SWATCH_COLORS) * _ROW_H + 32)
+
+    def sizeHint(self):
+        return self.minimumSizeHint()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pal = self.palette()
+        text_color = pal.color(QPalette.Active, QPalette.WindowText)
+
+        # Header row
+        painter.setPen(text_color)
+        painter.drawText(5, 14,
+            "Grip (⠿)   □ checked   ☑ checked   Palette role")
+
+        for i, (label, group, role) in enumerate(_SWATCH_COLORS):
+            y   = 20 + i * _ROW_H
+            cy  = y + _ROW_H // 2
+            color = pal.color(group, role)
+
+            # ── grip preview ─────────────────────────────────────────────
+            pen = QPen(color)
+            pen.setWidthF(1.5)
+            painter.setPen(pen)
+            for dy in (-5, 0, 5):
+                painter.drawLine(_GRIP_X, cy + dy, _GRIP_X + 14, cy + dy)
+
+            # ── unchecked box ─────────────────────────────────────────────
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(_BOX_X, cy - 8, 16, 16, 2, 2)
+
+            # ── checked box (box + tick) ──────────────────────────────────
+            painter.drawRoundedRect(_TICK_X, cy - 8, 16, 16, 2, 2)
+            tick = [
+                QPoint(_TICK_X + 3,  cy),
+                QPoint(_TICK_X + 6,  cy + 4),
+                QPoint(_TICK_X + 13, cy - 5),
+            ]
+            painter.drawPolyline(tick)
+
+            # ── label ─────────────────────────────────────────────────────
+            painter.setPen(text_color)
+            painter.drawText(_LABEL_X, cy + 5, label)
 
 
 class _DragHandleDelegate(QStyledItemDelegate):
@@ -291,6 +373,11 @@ class TreePanel(QWidget):
         sc_space.activated.connect(self._toggle_done_selected)
 
         layout.addWidget(self._tree_view)
+
+        if _SHOW_COLOR_SWATCHES:
+            self._swatch = _ColorSwatchWidget(self)
+            self._swatch.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            layout.addWidget(self._swatch)
 
     # ── view state persistence ─────────────────────────────────────────────
 

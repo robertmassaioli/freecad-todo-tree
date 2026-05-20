@@ -8,7 +8,7 @@ Set DEBUG = True to enable verbose per-render and per-interaction messages
 in the FreeCAD Report View. Leave False in normal use.
 """
 
-DEBUG = True
+DEBUG = False
 
 
 def log(msg: str) -> None:

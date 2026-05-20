@@ -352,6 +352,16 @@ class TodoItemModel(QAbstractItemModel):
         doc.commitTransaction()
         self.endMoveRows()
 
+    def set_node_expanded(self, index, expanded: bool):
+        """Update a node's expanded flag and flush to TreeData (no transaction)."""
+        if not index.isValid():
+            return
+        node = index.internalPointer()
+        if node.expanded == expanded:
+            return
+        self._tree.set_expanded(node.id, expanded)
+        self._flush_to_property()
+
     # ── navigation helper ──────────────────────────────────────────────────
 
     def index_for_node(self, node_id):

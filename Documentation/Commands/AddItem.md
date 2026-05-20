@@ -14,6 +14,8 @@ If nothing is selected the item is added at the top level of the current
 view root (the node you have navigated into, or the document root if you
 have not navigated anywhere).
 
+**Keyboard shortcut:** Shift+Return (when the tree panel has focus)
+
 <br/>
 
 ## <img height='24' src='../../freecad/TodoTree/Resources/Icons/AddChild.svg' /> + Child
@@ -26,6 +28,8 @@ root.
 
 After creation the new item's parent is automatically expanded so the
 child is immediately visible.
+
+**Keyboard shortcut:** Ctrl+Return (when the tree panel has focus)
 
 <br/>
 

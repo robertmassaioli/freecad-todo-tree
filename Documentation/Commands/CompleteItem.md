@@ -14,6 +14,10 @@ completed work is visually distinct from remaining tasks.
 Click the checkbox again to mark the item not-done and restore its normal
 appearance.
 
+**Keyboard shortcut:** Select the item and press **Space** to toggle its
+done state without reaching for the mouse. The item must be highlighted
+(selected) first.
+
 Toggling an item's state is undoable via **Edit → Undo** (Ctrl+Z).
 
 <br/>

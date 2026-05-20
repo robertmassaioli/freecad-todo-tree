@@ -19,7 +19,7 @@ import json
 from PySide.QtWidgets import (
     QWidget, QVBoxLayout, QToolBar, QTreeView,
     QAbstractItemView, QSizePolicy, QMenu, QApplication,
-    QStyledItemDelegate,
+    QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
 from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen, QPalette, QPainter
 try:
@@ -36,107 +36,56 @@ from .filter_proxy import DoneFilterProxy
 
 HANDLE_WIDTH = 18
 
-# ── Color debug ────────────────────────────────────────────────────────────────
-# Set True to show a color swatch panel at the bottom of every TreePanel.
-# Each row previews a different palette colour applied to the grip handle and
-# checkbox outline so you can pick the right one visually, then turn this off.
-_SHOW_COLOR_SWATCHES = True
-
-_SWATCH_COLORS = [
-    # (label, QPalette group, QPalette role)
-    ("1  Mid",                    QPalette.Active,   QPalette.Mid),
-    ("2  Midlight",               QPalette.Active,   QPalette.Midlight),
-    ("3  Dark",                   QPalette.Active,   QPalette.Dark),
-    ("4  Shadow",                 QPalette.Active,   QPalette.Shadow),
-    ("5  WindowText",             QPalette.Active,   QPalette.WindowText),
-    ("6  Text",                   QPalette.Active,   QPalette.Text),
-    ("7  ButtonText",             QPalette.Active,   QPalette.ButtonText),
-    ("8  Disabled / WindowText",  QPalette.Disabled, QPalette.WindowText),
-    ("9  Disabled / Text",        QPalette.Disabled, QPalette.Text),
-    ("10 Highlight",              QPalette.Active,   QPalette.Highlight),
-]
-
-_ROW_H   = 26   # height of each swatch row in pixels
-_GRIP_X  =  30  # x-start of grip preview
-_BOX_X   =  70  # x-start of unchecked box preview
-_TICK_X  = 100  # x-start of checked box preview
-_LABEL_X = 135  # x-start of label text
-
-
-class _ColorSwatchWidget(QWidget):
-    """
-    Temporary visual-debug panel.  Shows each palette colour in _SWATCH_COLORS
-    applied to both the grip handle (three lines) and a checkbox outline
-    (empty + ticked), labelled by number so you can refer to them by number
-    when asking for the final colour to use.
-    """
-
-    def minimumSizeHint(self):
-        return QSize(300, len(_SWATCH_COLORS) * _ROW_H + 32)
-
-    def sizeHint(self):
-        return self.minimumSizeHint()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        pal = self.palette()
-        text_color = pal.color(QPalette.Active, QPalette.WindowText)
-
-        # Header row
-        painter.setPen(text_color)
-        painter.drawText(5, 14,
-            "Grip (⠿)   □ checked   ☑ checked   Palette role")
-
-        for i, (label, group, role) in enumerate(_SWATCH_COLORS):
-            y   = 20 + i * _ROW_H
-            cy  = y + _ROW_H // 2
-            color = pal.color(group, role)
-
-            # ── grip preview ─────────────────────────────────────────────
-            pen = QPen(color)
-            pen.setWidthF(1.5)
-            painter.setPen(pen)
-            for dy in (-5, 0, 5):
-                painter.drawLine(_GRIP_X, cy + dy, _GRIP_X + 14, cy + dy)
-
-            # ── unchecked box ─────────────────────────────────────────────
-            painter.setPen(pen)
-            painter.setBrush(Qt.NoBrush)
-            painter.drawRoundedRect(_BOX_X, cy - 8, 16, 16, 2, 2)
-
-            # ── checked box (box + tick) ──────────────────────────────────
-            painter.drawRoundedRect(_TICK_X, cy - 8, 16, 16, 2, 2)
-            tick = [
-                QPoint(_TICK_X + 3,  cy),
-                QPoint(_TICK_X + 6,  cy + 4),
-                QPoint(_TICK_X + 13, cy - 5),
-            ]
-            painter.drawPolyline(tick)
-
-            # ── label ─────────────────────────────────────────────────────
-            painter.setPen(text_color)
-            painter.drawText(_LABEL_X, cy + 5, label)
-
-
 class _DragHandleDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         import copy
-        r = option.rect
-        # Draw grip lines first in left HANDLE_WIDTH px.
+        r   = option.rect
+        ink = option.palette.color(QPalette.Active, QPalette.Text)
+
+        # Grip lines in QPalette.Text — legible in both light and dark themes.
         painter.save()
-        pen = QPen(option.palette.mid().color())
-        pen.setWidth(1)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(ink)
+        pen.setWidthF(1.5)
         painter.setPen(pen)
         cx = r.left() + 5
         cy = r.center().y()
         for dy in (-4, 0, 4):
             painter.drawLine(cx, cy + dy, cx + 6, cy + dy)
         painter.restore()
-        # Shift the rect so the base delegate's checkbox+text don't overlap the grip.
+
+        # Let the base delegate paint checkbox + text in the shifted rect.
         shifted = copy.copy(option)
         shifted.rect = r.adjusted(HANDLE_WIDTH, 0, 0, 0)
         super().paint(painter, shifted, index)
+
+        # Overdraw the checkbox indicator in QPalette.Text so the outline and
+        # tick are legible regardless of what the system style renders underneath.
+        sopt = QStyleOptionViewItem()
+        self.initStyleOption(sopt, index)
+        sopt.rect = shifted.rect
+        check_rect = QApplication.style().subElementRect(
+            QStyle.SE_ItemViewItemCheckIndicator, sopt, None
+        )
+        if check_rect.isValid() and not check_rect.isEmpty():
+            painter.save()
+            painter.setRenderHint(QPainter.Antialiasing)
+            pen = QPen(ink)
+            pen.setWidthF(1.5)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(check_rect.adjusted(1, 1, -1, -1), 2, 2)
+            check_state = index.data(Qt.CheckStateRole)
+            if isinstance(check_state, int) and check_state == 2:
+                x0, y0 = check_rect.left(), check_rect.top()
+                w,  h  = check_rect.width(), check_rect.height()
+                tick = [
+                    QPoint(x0 + max(2, w // 5),    y0 + h // 2),
+                    QPoint(x0 + w // 2 - 1,         y0 + h - max(3, h // 4)),
+                    QPoint(x0 + w - max(2, w // 5), y0 + max(2, h // 5)),
+                ]
+                painter.drawPolyline(tick)
+            painter.restore()
 
     def editorEvent(self, event, model, option, index):
         import copy
@@ -373,11 +322,6 @@ class TreePanel(QWidget):
         sc_space.activated.connect(self._toggle_done_selected)
 
         layout.addWidget(self._tree_view)
-
-        if _SHOW_COLOR_SWATCHES:
-            self._swatch = _ColorSwatchWidget(self)
-            self._swatch.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            layout.addWidget(self._swatch)
 
     # ── view state persistence ─────────────────────────────────────────────
 

@@ -228,6 +228,11 @@ class TreePanel(QWidget):
             self._update_indent_actions
         )
 
+        # Persist expansion state whenever the user expands or collapses a node
+        # so _on_tree_reset can restore it correctly after undo/redo.
+        self._tree_view.expanded.connect(self._on_expansion_changed)
+        self._tree_view.collapsed.connect(self._on_expansion_changed)
+
         # Tab / Shift+Tab — indent / outdent (scoped to tree view).
         sc_indent = QShortcut(QKeySequence(Qt.Key_Tab), self._tree_view)
         sc_indent.setContext(Qt.WidgetShortcut)
@@ -436,6 +441,9 @@ class TreePanel(QWidget):
         src_idx = self._current_source_index()
         if src_idx.isValid():
             self._model.remove_node(src_idx)
+
+    def _on_expansion_changed(self, _proxy_index):
+        self._save_view_state()
 
     def _toggle_show_done(self, checked):
         self._proxy.set_show_done(checked)

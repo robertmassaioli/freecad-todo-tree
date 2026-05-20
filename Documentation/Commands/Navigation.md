@@ -58,6 +58,15 @@ Click the arrow next to any item to expand or collapse its children.
 Expanded items stay expanded when you navigate in and out of subtrees.
 The set of expanded items is saved with the document.
 
+**Keyboard navigation:** When the panel has focus, the arrow keys work as
+follows:
+
+- **↑ / ↓** — move the selection up or down through visible items.
+- **→** — expand the selected item. If it is already expanded, move
+  selection to its first child.
+- **←** — collapse the selected item. If it is already collapsed, move
+  selection to its parent.
+
 <br/>
 
 ## View state persistence

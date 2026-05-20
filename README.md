@@ -125,6 +125,8 @@ All shortcuts below are active only when the Todo Tree panel has keyboard focus 
 
 | Action | Windows / Linux | macOS |
 |--------|----------------|-------|
+| Move selection up / down | **↑ / ↓** | **↑ / ↓** |
+| Expand / collapse item | **→ / ←** | **→ / ←** |
 | Add sibling item (same level) | **Shift+Enter** | **Shift+Return** |
 | Add child item (one level deeper) | **Ctrl+Enter** | **⌘+Return** |
 | Go Into — make selected item the view root | **Enter** | **Return** |
@@ -133,6 +135,8 @@ All shortcuts below are active only when the Todo Tree panel has keyboard focus 
 | Outdent — move one level higher | **Shift+Tab** | **Shift+Tab** |
 | Toggle done / not-done | **Space** | **Space** |
 | Rename item inline | **Double-click** | **Double-click** |
+
+> **Arrow key behaviour:** **→** on an already-expanded item moves selection to its first child. **←** on a collapsed item moves selection to its parent. These are standard tree-view behaviours provided by Qt.
 
 Navigation commands (Go Into, Go Up) can also be assigned a global keyboard shortcut via **Tools → Customize → Keyboard** by searching for "Navigate Into" and "Navigate Up" in the Todo Tree group.
 

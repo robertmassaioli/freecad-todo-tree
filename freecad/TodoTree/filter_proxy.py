@@ -27,14 +27,12 @@ class DoneFilterProxy(QSortFilterProxyModel):
         return self._show_done
 
     def setData(self, index, value, role=Qt.EditRole):
-        log(f"proxy.setData: role={role!r} value={value!r}")
         return super().setData(index, value, role)
 
     def supportedDropActions(self):
         return self.sourceModel().supportedDropActions()
 
     def dropMimeData(self, data, action, row, column, proxy_parent):
-        log(f"proxy.dropMimeData: action={action!r} row={row} column={column} proxy_parent_valid={proxy_parent.isValid()}")
         if proxy_parent.isValid():
             src_parent = self.mapToSource(proxy_parent)
         else:
@@ -51,7 +49,8 @@ class DoneFilterProxy(QSortFilterProxyModel):
         else:
             src_row = row
 
-        log(f"proxy.dropMimeData: mapped to src_parent_valid={src_parent.isValid()} src_row={src_row}")
+        if row != src_row:
+            log(f"DROP proxy row mapping: proxy row {row} → source row {src_row} (filter active)")
         return self.sourceModel().dropMimeData(data, action, src_row, column, src_parent)
 
     def filterAcceptsRow(self, source_row, source_parent):

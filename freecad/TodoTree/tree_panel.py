@@ -74,33 +74,29 @@ class _DragInitFilter(QObject):
             if idx.isValid():
                 vis_rect = self._view.visualRect(idx)
                 local_x = event.x() - vis_rect.left()
-                log(f"DragFilter press: pos={event.pos().x()},{event.pos().y()} vis_rect.left={vis_rect.left()} local_x={local_x} HANDLE_WIDTH={HANDLE_WIDTH} in_handle={local_x < HANDLE_WIDTH}")
                 if local_x < HANDLE_WIDTH:
                     self._drag_from_handle = True
                     self._drag_start_pos = event.pos()
                 else:
                     self._drag_from_handle = False
             else:
-                log(f"DragFilter press: no item at pos={event.pos().x()},{event.pos().y()}")
                 self._drag_from_handle = False
             return False
 
         if event.type() == QEvent.MouseMove and event.buttons() & Qt.LeftButton:
             if self._drag_from_handle and self._drag_start_pos is not None:
                 dist = (event.pos() - self._drag_start_pos).manhattanLength()
-                log(f"DragFilter move: dist={dist} threshold={QApplication.startDragDistance()}")
                 if dist > QApplication.startDragDistance():
                     index = self._view.indexAt(self._drag_start_pos)
-                    log(f"DragFilter initiating drag: index_valid={index.isValid()}")
                     if index.isValid():
                         mime = self._view.model().mimeData([index])
-                        log(f"DragFilter mimeData returned: {mime!r} formats={mime.formats() if mime else None}")
                         if mime:
                             drag = QDrag(self._view)
                             drag.setMimeData(mime)
                             self._drag_from_handle = False
                             result = drag.exec_(Qt.MoveAction)
-                            log(f"DragFilter drag.exec_ result={result!r}")
+                            if result == 0:
+                                log("DRAG completed: drop was not accepted by target")
                             return True
                     self._drag_from_handle = False
             return False
@@ -113,12 +109,8 @@ class _DragInitFilter(QObject):
 
 
 class _ClickLogger(QObject):
-    """Event filter that logs mouse presses on the tree view viewport (debug only)."""
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress:
-            from .debug import log
-            log(f"viewport click: pos={event.pos().x()},{event.pos().y()} button={event.button()!r}")
-        return False  # don't consume the event
+        return False
 
 
 class TreePanel(QWidget):
@@ -215,8 +207,6 @@ class TreePanel(QWidget):
         self._tree_view = QTreeView(self)
         self._tree_view.setModel(self._proxy)
         self._tree_view.setHeaderHidden(True)
-        trigger = QAbstractItemView.DoubleClicked
-        log(f"QAbstractItemView.DoubleClicked = {trigger!r}")
         self._tree_view.setEditTriggers(QAbstractItemView.DoubleClicked)
         self._tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
         self._tree_view.setContextMenuPolicy(Qt.CustomContextMenu)

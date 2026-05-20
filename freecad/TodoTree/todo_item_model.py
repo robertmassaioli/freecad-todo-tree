@@ -91,7 +91,6 @@ class TodoItemModel(QAbstractItemModel):
         if role in (Qt.DisplayRole, Qt.EditRole):
             return node.text
         if role == Qt.CheckStateRole:
-            log(f"data(CheckStateRole): node={node.text!r} done={node.done!r}")
             # Return plain integers so Qt6's C++ delegate can call toInt() correctly.
             # Returning a Python enum causes Qt6 to always read the state as 0 (Unchecked),
             # making unchecking impossible (it always re-checks the item).
@@ -108,9 +107,7 @@ class TodoItemModel(QAbstractItemModel):
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
-        log(f"setData: role={role!r} value={value!r}")
         if not index.isValid():
-            log("setData: index invalid, returning False")
             return False
         node = index.internalPointer()
         doc = self._fc_object.Document
@@ -130,9 +127,7 @@ class TodoItemModel(QAbstractItemModel):
             # value may be a Python enum or a plain int depending on what called setData.
             # bool() works for both: 0/Unchecked → False, 2/Checked → True.
             done = bool(value)
-            log(f"setData CheckStateRole: value={value!r} done={done!r} node.done={node.done!r}")
             if done == node.done:
-                log("setData CheckStateRole: no change, returning False")
                 return False
             doc.openTransaction("Todo: toggle done")
             self._tree.set_done(node.id, done)
@@ -146,10 +141,8 @@ class TodoItemModel(QAbstractItemModel):
     def flags(self, index):
         if not index.isValid():
             return Qt.ItemIsDropEnabled
-        f = (Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
-             | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled)
-        log(f"flags: {f!r}")
-        return f
+        return (Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
+                | Qt.ItemIsUserCheckable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled)
 
     def supportedDropActions(self):
         return Qt.MoveAction
@@ -159,82 +152,74 @@ class TodoItemModel(QAbstractItemModel):
 
     def mimeData(self, indexes):
         valid = [i for i in indexes if i.isValid()]
-        log(f"mimeData: {len(indexes)} indexes, {len(valid)} valid")
         if not valid:
             return None
-        node_id = valid[0].internalPointer().id
-        log(f"mimeData: encoding node_id={node_id!r}")
+        node = valid[0].internalPointer()
+        log(f"DRAG start: '{node.text}'")
         mime = QMimeData()
         mime.setData("application/x-todotree-node",
-                     json.dumps({"id": node_id}).encode("utf-8"))
+                     json.dumps({"id": node.id}).encode("utf-8"))
         return mime
 
     def dropMimeData(self, data, action, row, column, parent):
-        log(f"dropMimeData: action={action!r} row={row} column={column} parent_valid={parent.isValid()} has_format={data.hasFormat('application/x-todotree-node')}")
         if not data.hasFormat("application/x-todotree-node"):
             return False
         try:
             payload = json.loads(bytes(data.data("application/x-todotree-node")).decode("utf-8"))
             node_id = payload["id"]
         except (ValueError, KeyError):
-            log("dropMimeData: failed to decode payload")
+            log("DROP rejected: could not decode MIME payload")
             return False
 
-        log(f"dropMimeData: node_id={node_id!r}")
         node = self._tree.get_node(node_id)
         if node is None:
-            log("dropMimeData: node not found in tree")
+            log("DROP rejected: dragged node no longer exists")
             return False
 
         # Determine destination parent node and insert_row.
         if parent.isValid():
             dest_parent_node = parent.internalPointer()
-            dest_parent_id = dest_parent_node.id
         else:
             dest_parent_node = self._tree.root
-            dest_parent_id = "root"
 
         if row == -1:
             # Drop onto an item — append as last child.
             insert_row = len(dest_parent_node.children)
+            drop_desc = f"onto '{dest_parent_node.text}' (as last child, position {insert_row})"
         else:
             insert_row = row
-
-        log(f"dropMimeData: dest_parent_id={dest_parent_id!r} insert_row={insert_row}")
+            dest_parent_label = "root" if dest_parent_node is self._tree.root else f"'{dest_parent_node.text}'"
+            siblings = dest_parent_node.children
+            before = f"before '{siblings[insert_row].text}'" if insert_row < len(siblings) else "at end"
+            drop_desc = f"under {dest_parent_label}, {before} (position {insert_row})"
 
         # Guard: cannot move a node into itself or its descendants.
         cur = dest_parent_node
         while cur is not None:
             if cur is node:
-                log("dropMimeData: rejected — would move node into own subtree")
+                log(f"DROP rejected: cannot move '{node.text}' into its own subtree")
                 return False
             cur = cur._parent
 
         old_parent_node = node._parent if node._parent else self._tree.root
-        old_parent_id = old_parent_node.id
         src_row = old_parent_node.children.index(node)
+        old_parent_label = "root" if old_parent_node is self._tree.root else f"'{old_parent_node.text}'"
 
-        log(f"dropMimeData: src old_parent_id={old_parent_id!r} src_row={src_row}")
+        log(f"DROP '{node.text}': from {old_parent_label}[{src_row}] → {drop_desc}")
 
         old_parent_idx = (QModelIndex() if old_parent_node is self._tree.root
-                          else self.index_for_node(old_parent_id))
+                          else self.index_for_node(old_parent_node.id))
         dest_parent_idx = (QModelIndex() if dest_parent_node is self._tree.root
-                           else self.index_for_node(dest_parent_id))
+                           else self.index_for_node(dest_parent_node.id))
 
-        # Compute beginMoveRows destination and the effective insert row for move_node.
-        #
-        # beginMoveRows uses pre-removal coordinates: destinationChild is the row *before
-        # which* the item lands in the FINAL state (Qt docs: "use rowCount() to append").
-        # For a same-parent downward move, bm_dest = insert_row (no +1).
-        # The one forbidden range is [src_row, src_row+1] — but that only occurs when
-        # insert_row == src_row+1, which means "drop immediately below self" = no-op.
-        #
-        # move_node uses post-removal coordinates, so for same-parent downward moves we
-        # subtract 1 to account for the source row being removed before insertion.
+        # beginMoveRows uses pre-removal coordinates; move_node uses post-removal.
+        # For a same-parent downward move the forbidden range [src_row, src_row+1]
+        # only occurs at insert_row == src_row+1, which is a visual no-op.
+        # For all real downward moves: bm_dest = insert_row, effective = insert_row - 1.
         same_parent = (old_parent_node is dest_parent_node)
         if same_parent and src_row < insert_row:
             if insert_row <= src_row + 1:
-                log("dropMimeData: no-op (item dropped onto its own position)")
+                log(f"DROP '{node.text}': no-op (dropped back onto its own position)")
                 return True
             bm_dest = insert_row
             effective_insert_row = insert_row - 1
@@ -242,25 +227,22 @@ class TodoItemModel(QAbstractItemModel):
             bm_dest = insert_row
             effective_insert_row = insert_row
 
-        log(f"dropMimeData: beginMoveRows old_parent_valid={old_parent_idx.isValid()} src_row={src_row} dest_parent_valid={dest_parent_idx.isValid()} bm_dest={bm_dest} effective_insert_row={effective_insert_row}")
-
         doc = self._fc_object.Document
         doc.openTransaction("Todo: move item")
         ok = self.beginMoveRows(old_parent_idx, src_row, src_row, dest_parent_idx, bm_dest)
-        log(f"dropMimeData: beginMoveRows ok={ok}")
         if not ok:
+            log(f"DROP '{node.text}': beginMoveRows rejected (src={src_row} bm_dest={bm_dest})")
             doc.abortTransaction()
             return False
-        moved = self._tree.move_node(node_id, dest_parent_id, effective_insert_row)
-        log(f"dropMimeData: move_node returned={moved}")
+        moved = self._tree.move_node(node_id, dest_parent_node.id, effective_insert_row)
         if not moved:
+            log(f"DROP '{node.text}': move_node rejected")
             self.endMoveRows()
             doc.abortTransaction()
             return False
         self._flush_to_property()
         doc.commitTransaction()
         self.endMoveRows()
-        log("dropMimeData: success")
         return True
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):

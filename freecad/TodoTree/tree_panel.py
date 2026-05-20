@@ -240,6 +240,23 @@ class TreePanel(QWidget):
         self._tree_view.expanded.connect(self._on_expansion_changed)
         self._tree_view.collapsed.connect(self._on_expansion_changed)
 
+        # Shift+Return — add sibling item; Ctrl+Return — add child item.
+        sc_add = QShortcut(QKeySequence(Qt.SHIFT | Qt.Key_Return), self._tree_view)
+        sc_add.setContext(Qt.WidgetShortcut)
+        sc_add.activated.connect(self._add_sibling)
+
+        sc_add_kp = QShortcut(QKeySequence(Qt.SHIFT | Qt.Key_Enter), self._tree_view)
+        sc_add_kp.setContext(Qt.WidgetShortcut)
+        sc_add_kp.activated.connect(self._add_sibling)
+
+        sc_add_child = QShortcut(QKeySequence(Qt.CTRL | Qt.Key_Return), self._tree_view)
+        sc_add_child.setContext(Qt.WidgetShortcut)
+        sc_add_child.activated.connect(self._add_child)
+
+        sc_add_child_kp = QShortcut(QKeySequence(Qt.CTRL | Qt.Key_Enter), self._tree_view)
+        sc_add_child_kp.setContext(Qt.WidgetShortcut)
+        sc_add_child_kp.activated.connect(self._add_child)
+
         # Tab / Shift+Tab — indent / outdent (scoped to tree view).
         sc_indent = QShortcut(QKeySequence(Qt.Key_Tab), self._tree_view)
         sc_indent.setContext(Qt.WidgetShortcut)

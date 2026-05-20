@@ -115,15 +115,20 @@ All structural changes (add, delete, rename, check/uncheck) integrate with FreeC
 
 ## Keyboard shortcuts
 
-These shortcuts are active when the Todo Tree panel has keyboard focus.
+All shortcuts below are active only when the Todo Tree panel has keyboard focus — they have no effect anywhere else in FreeCAD.
 
-| Shortcut | Action |
-|---|---|
-| **Enter** | Go Into — make the selected item the root of the view |
-| **Backspace** | Go Up — ascend one level in the breadcrumb |
-| **Tab** | Indent — move the selected item one level deeper (under its previous sibling) |
-| **Shift+Tab** | Outdent — move the selected item one level higher |
-| **Double-click** | Edit the selected item's label inline |
+> **macOS note:** The main confirmation key is labelled **Return** on Mac keyboards and **Enter** on Windows/Linux keyboards — they are the same key. Qt maps `Ctrl` shortcuts to the **⌘ Command** key on macOS.
+
+| Action | Windows / Linux | macOS |
+|--------|----------------|-------|
+| Add sibling item (same level) | **Shift+Enter** | **Shift+Return** |
+| Add child item (one level deeper) | **Ctrl+Enter** | **⌘+Return** |
+| Go Into — make selected item the view root | **Enter** | **Return** |
+| Go Up — ascend one breadcrumb level | **Backspace** | **Backspace** |
+| Indent — move one level deeper | **Tab** | **Tab** |
+| Outdent — move one level higher | **Shift+Tab** | **Shift+Tab** |
+| Toggle done / not-done | **Space** | **Space** |
+| Rename item inline | **Double-click** | **Double-click** |
 
 Navigation commands (Go Into, Go Up) can also be assigned a global keyboard shortcut via **Tools → Customize → Keyboard** by searching for "Navigate Into" and "Navigate Up" in the Todo Tree group.
 

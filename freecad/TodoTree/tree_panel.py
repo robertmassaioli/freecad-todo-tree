@@ -19,14 +19,14 @@ import json
 from PySide.QtWidgets import (
     QWidget, QVBoxLayout, QToolBar, QTreeView,
     QAbstractItemView, QSizePolicy, QMenu, QApplication,
-    QStyledItemDelegate,
+    QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
-from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen
+from PySide.QtGui import QAction, QKeySequence, QShortcut, QPen, QPalette, QPainter
 try:
     from PySide.QtGui import QDrag
 except ImportError:
     from PySide.QtWidgets import QDrag
-from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent
+from PySide.QtCore import Qt, QModelIndex, QSize, QObject, QEvent, QPoint
 import FreeCAD as _fc
 
 from .breadcrumb_widget import BreadcrumbWidget
@@ -36,25 +36,56 @@ from .filter_proxy import DoneFilterProxy
 
 HANDLE_WIDTH = 18
 
-
 class _DragHandleDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         import copy
-        r = option.rect
-        # Draw grip lines first in left HANDLE_WIDTH px.
+        r   = option.rect
+        ink = option.palette.color(QPalette.Active, QPalette.Text)
+
+        # Grip lines in QPalette.Text — legible in both light and dark themes.
         painter.save()
-        pen = QPen(option.palette.mid().color())
-        pen.setWidth(1)
+        painter.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(ink)
+        pen.setWidthF(1.5)
         painter.setPen(pen)
         cx = r.left() + 5
         cy = r.center().y()
         for dy in (-4, 0, 4):
             painter.drawLine(cx, cy + dy, cx + 6, cy + dy)
         painter.restore()
-        # Shift the rect so the base delegate's checkbox+text don't overlap the grip.
+
+        # Let the base delegate paint checkbox + text in the shifted rect.
         shifted = copy.copy(option)
         shifted.rect = r.adjusted(HANDLE_WIDTH, 0, 0, 0)
         super().paint(painter, shifted, index)
+
+        # Overdraw the checkbox indicator in QPalette.Text so the outline and
+        # tick are legible regardless of what the system style renders underneath.
+        sopt = QStyleOptionViewItem()
+        self.initStyleOption(sopt, index)
+        sopt.rect = shifted.rect
+        check_rect = QApplication.style().subElementRect(
+            QStyle.SE_ItemViewItemCheckIndicator, sopt, None
+        )
+        if check_rect.isValid() and not check_rect.isEmpty():
+            painter.save()
+            painter.setRenderHint(QPainter.Antialiasing)
+            pen = QPen(ink)
+            pen.setWidthF(1.5)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawRoundedRect(check_rect.adjusted(1, 1, -1, -1), 2, 2)
+            check_state = index.data(Qt.CheckStateRole)
+            if isinstance(check_state, int) and check_state == 2:
+                x0, y0 = check_rect.left(), check_rect.top()
+                w,  h  = check_rect.width(), check_rect.height()
+                tick = [
+                    QPoint(x0 + max(2, w // 5),    y0 + h // 2),
+                    QPoint(x0 + w // 2 - 1,         y0 + h - max(3, h // 4)),
+                    QPoint(x0 + w - max(2, w // 5), y0 + max(2, h // 5)),
+                ]
+                painter.drawPolyline(tick)
+            painter.restore()
 
     def editorEvent(self, event, model, option, index):
         import copy

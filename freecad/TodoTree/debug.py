@@ -22,9 +22,10 @@ import enum
 
 
 class Category(enum.Enum):
-    DRAG_DROP = "drag_drop"  # drag-and-drop reorder gestures and drops
-    DOCUMENT  = "document"   # document open / close / switch lifecycle
-    OBJECT    = "object"     # FreeCAD TodoTree object and ViewProvider lifecycle
+    DRAG_DROP  = "drag_drop"   # drag-and-drop reorder gestures and drops
+    DOCUMENT   = "document"    # document open / close / switch lifecycle
+    OBJECT     = "object"      # FreeCAD TodoTree object and ViewProvider lifecycle
+    BREADCRUMB = "breadcrumb"  # breadcrumb bar layout and truncation decisions
 
 
 # Add Category members here to enable their logging output.

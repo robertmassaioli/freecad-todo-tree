@@ -6,6 +6,8 @@
 from PySide.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QMenu
 from PySide.QtCore import Qt, Signal, QPoint
 
+from .debug import log, Category
+
 
 # Estimated horizontal padding for a flat crumb button (px). A heuristic —
 # real button padding is platform-dependent, but this is close enough for
@@ -39,10 +41,14 @@ class BreadcrumbWidget(QWidget):
         path_nodes: list of (node_id: str, label: str) tuples from root to current.
         """
         self._path_nodes = list(path_nodes)
+        labels = [self._display(lbl) for _, lbl in path_nodes]
+        log(Category.BREADCRUMB, f"set_path: {' > '.join(labels)} ({len(path_nodes)} crumbs)")
         self._relayout()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        log(Category.BREADCRUMB,
+            f"resizeEvent: widget width={self.width()}px, path has {len(self._path_nodes)} crumbs")
         self._relayout()
 
     # ── measurement helpers ────────────────────────────────────────────────
@@ -61,6 +67,9 @@ class BreadcrumbWidget(QWidget):
     # ── layout ────────────────────────────────────────────────────────────
 
     def _relayout(self):
+        old_count = self._layout.count()
+        log(Category.BREADCRUMB,
+            f"_relayout: clearing {old_count} layout items, widget width={self.width()}px")
         while self._layout.count():
             item = self._layout.takeAt(0)
             if item.widget():
@@ -68,9 +77,13 @@ class BreadcrumbWidget(QWidget):
 
         if not self._path_nodes:
             self._layout.addStretch()
+            log(Category.BREADCRUMB, "_relayout: path is empty, nothing to render")
             return
 
         visible, hidden = self._compute_visible()
+        log(Category.BREADCRUMB,
+            f"_relayout: rendering {len(visible)} visible crumbs, "
+            f"{len(hidden)} hidden behind ellipsis")
         self._render(visible, hidden)
 
     def _compute_visible(self):
@@ -95,23 +108,41 @@ class BreadcrumbWidget(QWidget):
         first, last = nodes[0], nodes[-1]
         middle = nodes[1:-1]
 
+        first_w = self._crumb_px(first[1])
+        last_w  = self._crumb_px(last[1])
+
         # Minimum committed width: first crumb + separator + last crumb.
-        running = self._crumb_px(first[1]) + sep_w + self._crumb_px(last[1])
+        running = first_w + sep_w + last_w
+
+        log(Category.BREADCRUMB,
+            f"_compute_visible: available={available}px  sep={sep_w}px  ellipsis={ellipsis_w}px  "
+            f"first='{self._display(first[1])}'({first_w}px)  "
+            f"last='{self._display(last[1])}'({last_w}px)  "
+            f"base_running={running}px  middle={[self._display(lbl) for _, lbl in middle]}")
 
         shown  = []
         hidden = list(middle)
 
         for item in middle:
-            needed = sep_w + self._crumb_px(item[1])
-            # Crumbs that would still be hidden if we include this one.
+            crumb_w = self._crumb_px(item[1])
+            needed  = sep_w + crumb_w
             remaining_hidden = len(hidden) - 1
             ellipsis_slot = (sep_w + ellipsis_w) if remaining_hidden > 0 else 0
-            if running + needed + ellipsis_slot <= available:
+            fits = (running + needed + ellipsis_slot <= available)
+            log(Category.BREADCRUMB,
+                f"  crumb '{self._display(item[1])}': width={crumb_w}px  needed={needed}px  "
+                f"ellipsis_slot={ellipsis_slot}px  running+needed+slot="
+                f"{running + needed + ellipsis_slot}px  fits={fits}")
+            if fits:
                 shown.append(item)
                 hidden.remove(item)
                 running += needed
             else:
                 break
+
+        log(Category.BREADCRUMB,
+            f"_compute_visible result: visible=[{', '.join(self._display(lbl) for _, lbl in [first] + shown + [last])}]  "
+            f"hidden=[{', '.join(self._display(lbl) for _, lbl in hidden)}]")
 
         return [first] + shown + [last], hidden
 
@@ -150,19 +181,30 @@ class BreadcrumbWidget(QWidget):
         self._layout.addWidget(sep)
 
     def _add_ellipsis(self, hidden_nodes):
+        log(Category.BREADCRUMB,
+            f"_add_ellipsis: building menu with {len(hidden_nodes)} item(s): "
+            f"[{', '.join(self._display(lbl) for _, lbl in hidden_nodes)}]")
         btn = QPushButton("…")
         btn.setFlat(True)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setStyleSheet("border: none;")
         menu = QMenu(btn)
         for node_id, label in hidden_nodes:
-            action = menu.addAction(self._display(label))
+            display = self._display(label)
+            log(Category.BREADCRUMB, f"  adding menu action: '{display}' (id={node_id})")
+            action = menu.addAction(display)
             action.triggered.connect(
                 lambda _c, nid=node_id: self.nodeClicked.emit(nid)
             )
+        log(Category.BREADCRUMB,
+            f"_add_ellipsis: menu has {menu.actions().__len__()} action(s), "
+            f"btn id={id(btn):#x}  menu id={id(menu):#x}")
         btn.clicked.connect(
-            lambda _c, m=menu, b=btn: m.exec_(
-                b.mapToGlobal(QPoint(0, b.height()))
+            lambda _c, m=menu, b=btn: (
+                log(Category.BREADCRUMB,
+                    f"ellipsis clicked: showing menu with {len(m.actions())} action(s)  "
+                    f"btn id={id(b):#x}  menu id={id(m):#x}"),
+                m.exec_(b.mapToGlobal(QPoint(0, b.height())))
             )
         )
         self._layout.addWidget(btn)

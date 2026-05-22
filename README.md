@@ -30,6 +30,8 @@ Key capabilities:
 
 Full command reference is in the [Documentation](Documentation/README.md) directory.
 
+For contributors: see [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, running tests, architecture overview, and coding conventions.
+
 ## How to install
 
 ### Via the Addon Manager (recommended)
@@ -134,7 +136,7 @@ All shortcuts below are active only when the Todo Tree panel has keyboard focus 
 | Indent — move one level deeper | **Tab** | **Tab** |
 | Outdent — move one level higher | **Shift+Tab** | **Shift+Tab** |
 | Toggle done / not-done | **Space** | **Space** |
-| Rename item inline | **Double-click** | **Double-click** |
+| Rename item inline | **F2** or **Double-click** | **F2** or **Double-click** |
 
 > **Arrow key behaviour:** **→** on an already-expanded item moves selection to its first child. **←** on a collapsed item moves selection to its parent. These are standard tree-view behaviours provided by Qt.
 

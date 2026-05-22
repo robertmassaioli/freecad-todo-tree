@@ -1,7 +1,7 @@
 # Ten Improvements Proposal
 
 **Date:** 2026-05-22  
-**Status:** Proposal — for review and prioritisation
+**Status:** In progress — items 1, 7, and 8 completed on `feature/unit-tests`
 
 This document proposes ten concrete improvements across functional,
 usability, documentation, and engineering dimensions. Items already covered
@@ -9,11 +9,12 @@ by an existing focused proposal are cross-referenced rather than duplicated.
 
 ---
 
-## 1. F2 keyboard shortcut to rename the selected item
+## 1. F2 keyboard shortcut to rename the selected item ✓ Done
 
 **Area:** Usability  
 **Effort:** Trivial (< 30 minutes)  
-**Priority:** High
+**Priority:** High  
+**Completed:** 2026-05-22 on `feature/unit-tests`
 
 ### Problem
 
@@ -310,11 +311,12 @@ brief UI pause. For the typical todo list size this is not a concern.
 
 ---
 
-## 7. Unit test suite
+## 7. Unit test suite ✓ Done
 
 **Area:** Engineering quality  
 **Effort:** High (initial setup + ongoing commitment)  
-**Priority:** High (long-term maintainability)
+**Priority:** High (long-term maintainability)  
+**Completed:** 2026-05-22 on `feature/unit-tests`
 
 ### Problem
 
@@ -356,11 +358,12 @@ the data layer has no FreeCAD imports.
 
 ---
 
-## 8. Contributing and architecture documentation
+## 8. Contributing and architecture documentation ✓ Done
 
 **Area:** Documentation  
 **Effort:** Low-Medium (2–4 hours)  
-**Priority:** Medium
+**Priority:** Medium  
+**Completed:** 2026-05-22 on `feature/unit-tests`
 
 ### Problem
 
@@ -495,18 +498,18 @@ Schema version must be bumped (see Improvement 4).
 
 ## Summary table
 
-| # | Improvement | Area | Effort | Priority |
-|---|-------------|------|--------|----------|
-| 1 | F2 shortcut to rename | Usability | Trivial | High |
-| 2 | Live text search / quick-filter | Functional | Medium | High |
-| 3 | Export to Markdown / plain text | Functional | Medium | Medium |
-| 4 | JSON schema versioning | Robustness | Low-Medium | Medium |
-| 5 | Copy / duplicate subtree | Functional | Medium | Medium |
-| 6 | Expand all / Collapse all | Usability | Low | Low-Medium |
-| 7 | Unit test suite | Engineering | High | High |
-| 8 | Contributing & architecture docs | Documentation | Low-Medium | Medium |
-| 9 | Breadcrumb truncation | Usability | Low-Medium | Low |
-| 10 | Per-item notes field | Functional | Medium-High | Low-Medium |
+| # | Improvement | Area | Effort | Priority | Status |
+|---|-------------|------|--------|----------|--------|
+| 1 | F2 shortcut to rename | Usability | Trivial | High | ✓ Done |
+| 2 | Live text search / quick-filter | Functional | Medium | High | Open |
+| 3 | Export to Markdown / plain text | Functional | Medium | Medium | Open |
+| 4 | JSON schema versioning | Robustness | Low-Medium | Medium | Open |
+| 5 | Copy / duplicate subtree | Functional | Medium | Medium | Open |
+| 6 | Expand all / Collapse all | Usability | Low | Low-Medium | Open |
+| 7 | Unit test suite | Engineering | High | High | ✓ Done |
+| 8 | Contributing & architecture docs | Documentation | Low-Medium | Medium | ✓ Done |
+| 9 | Breadcrumb truncation | Usability | Low-Medium | Low | Open |
+| 10 | Per-item notes field | Functional | Medium-High | Low-Medium | Open |
 
 ---
 

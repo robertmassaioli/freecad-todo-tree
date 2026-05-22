@@ -39,8 +39,8 @@ Both commands open the new item in **inline edit mode** immediately. Type
 the item's label and press Enter to confirm, or press Escape to cancel
 (the item is removed on cancel).
 
-Double-clicking any existing item also opens it in inline edit mode so
-you can rename it.
+Double-clicking any existing item, or pressing **F2** with it selected,
+opens it in inline edit mode so you can rename it.
 
 <br/>
 

@@ -31,6 +31,7 @@ class BreadcrumbWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._path_nodes = []   # [(node_id, label), …]
+        self._last_layout_width = -1  # width at last _relayout(); guards resize loop
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(6, 2, 6, 2)
         self._layout.setSpacing(2)
@@ -47,8 +48,16 @@ class BreadcrumbWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        new_width = self.width()
+        if new_width == self._last_layout_width:
+            # Adding/removing widgets causes Qt to re-evaluate geometry and fire
+            # resizeEvent even when the width hasn't changed. Skip the relayout
+            # to break the resulting infinite loop.
+            log(Category.BREADCRUMB,
+                f"resizeEvent: width unchanged at {new_width}px, skipping relayout")
+            return
         log(Category.BREADCRUMB,
-            f"resizeEvent: widget width={self.width()}px, path has {len(self._path_nodes)} crumbs")
+            f"resizeEvent: width changed {self._last_layout_width}px → {new_width}px")
         self._relayout()
 
     # ── measurement helpers ────────────────────────────────────────────────
@@ -67,6 +76,7 @@ class BreadcrumbWidget(QWidget):
     # ── layout ────────────────────────────────────────────────────────────
 
     def _relayout(self):
+        self._last_layout_width = self.width()
         old_count = self._layout.count()
         log(Category.BREADCRUMB,
             f"_relayout: clearing {old_count} layout items, widget width={self.width()}px")

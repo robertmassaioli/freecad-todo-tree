@@ -3,7 +3,7 @@
 
 """Breadcrumb bar showing the current navigation path through the todo hierarchy."""
 
-from PySide.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QMenu
+from PySide.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QMenu, QSizePolicy
 from PySide.QtCore import Qt, Signal, QPoint
 
 from .debug import log, Category
@@ -36,6 +36,14 @@ class BreadcrumbWidget(QWidget):
         self._layout.setContentsMargins(6, 2, 6, 2)
         self._layout.setSpacing(2)
         self.setStyleSheet("background: palette(midlight);")
+        # Do not let the breadcrumb content push the panel wider. Qt computes a
+        # panel's minimum width from its children's sizeHint / minimumSizeHint.
+        # Without these two lines the panel expands (and can't be shrunk) as
+        # crumbs are added, because QHBoxLayout sums all button widths.
+        # With Ignored + setMinimumWidth(0) the parent layout ignores our width
+        # hint entirely and we truncate the content ourselves in _relayout().
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.setMinimumWidth(0)
 
     def set_path(self, path_nodes):
         """

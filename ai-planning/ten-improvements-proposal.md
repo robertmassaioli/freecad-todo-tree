@@ -397,11 +397,12 @@ Add two documents:
 
 ---
 
-## 9. Intelligent breadcrumb truncation for narrow panels
+## 9. Intelligent breadcrumb truncation for narrow panels ✓ Done
 
 **Area:** Usability  
 **Effort:** Low-Medium (2–3 hours)  
-**Priority:** Low
+**Priority:** Low  
+**Completed:** 2026-05-22 on `feature/breadcrumb-truncation`, merged to `main`
 
 ### Problem
 
@@ -508,7 +509,7 @@ Schema version must be bumped (see Improvement 4).
 | 6 | Expand all / Collapse all | Usability | Low | Low-Medium | Open |
 | 7 | Unit test suite | Engineering | High | High | ✓ Done |
 | 8 | Contributing & architecture docs | Documentation | Low-Medium | Medium | ✓ Done |
-| 9 | Breadcrumb truncation | Usability | Low-Medium | Low | Open |
+| 9 | Breadcrumb truncation | Usability | Low-Medium | Low | ✓ Done |
 | 10 | Per-item notes field | Functional | Medium-High | Low-Medium | Open |
 
 ---

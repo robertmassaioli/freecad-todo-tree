@@ -321,6 +321,11 @@ class TreePanel(QWidget):
         sc_space.setContext(Qt.WidgetShortcut)
         sc_space.activated.connect(self._toggle_done_selected)
 
+        # F2 — rename the selected item inline (standard convention).
+        sc_rename = QShortcut(QKeySequence(Qt.Key_F2), self._tree_view)
+        sc_rename.setContext(Qt.WidgetShortcut)
+        sc_rename.activated.connect(self._rename_selected)
+
         layout.addWidget(self._tree_view)
 
     # ── view state persistence ─────────────────────────────────────────────
@@ -492,6 +497,11 @@ class TreePanel(QWidget):
             proxy_idx = self._proxy.mapFromSource(src_idx)
             self._tree_view.setCurrentIndex(proxy_idx)
             self._tree_view.edit(proxy_idx)
+
+    def _rename_selected(self):
+        src_idx = self._current_source_index()
+        if src_idx.isValid():
+            self._start_edit(src_idx)
 
     def _toggle_done_selected(self):
         src_idx = self._current_source_index()

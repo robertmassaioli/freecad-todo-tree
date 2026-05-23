@@ -1,7 +1,18 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileNotice: Part of the TodoTree addon.
 
-"""QSortFilterProxyModel that hides done nodes (and their entire subtrees)."""
+"""Proxy models that sit between TodoItemModel and QTreeView.
+
+Proxy chain (source → view):
+    TodoItemModel → DoneFilterProxy → TextSearchProxy → QTreeView
+
+DoneFilterProxy hides done items when show_done is False.
+TextSearchProxy hides items whose text does not match the search string
+(a row is kept if it matches OR if any of its descendants match, so the
+tree path to a hit remains navigable). Searching is scoped to the current
+view root — items outside it are not searched (Qt's setRootIndex handles
+this automatically).
+"""
 
 from PySide.QtCore import Qt, QSortFilterProxyModel, QModelIndex
 from .debug import log, Category
@@ -64,3 +75,45 @@ class DoneFilterProxy(QSortFilterProxyModel):
             if node and node.done:
                 return False
         return True
+
+
+class TextSearchProxy(QSortFilterProxyModel):
+    """
+    Case-insensitive substring filter. A row is shown if its display text
+    contains the search string OR if any descendant row (visible through the
+    source proxy) does, so the ancestor path to a match stays navigable.
+
+    When search_text is empty every row passes through (no-op).
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._search_text = ""
+
+    def set_search_text(self, text):
+        normalised = text.strip().lower()
+        if normalised == self._search_text:
+            return
+        self._search_text = normalised
+        self.invalidateFilter()
+
+    @property
+    def search_text(self):
+        return self._search_text
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        if not self._search_text:
+            return True
+        source_model = self.sourceModel()
+        idx = source_model.index(source_row, 0, source_parent)
+        return self._row_or_descendant_matches(idx, source_model)
+
+    def _row_or_descendant_matches(self, idx, source_model):
+        text = (source_model.data(idx, Qt.DisplayRole) or "").lower()
+        if self._search_text in text:
+            return True
+        for row in range(source_model.rowCount(idx)):
+            child = source_model.index(row, 0, idx)
+            if self._row_or_descendant_matches(child, source_model):
+                return True
+        return False

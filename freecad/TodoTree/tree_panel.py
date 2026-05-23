@@ -17,7 +17,7 @@ the model, a change in one is immediately reflected in the other.
 import json
 
 from PySide.QtWidgets import (
-    QWidget, QVBoxLayout, QToolBar, QTreeView,
+    QWidget, QVBoxLayout, QToolBar, QTreeView, QLineEdit,
     QAbstractItemView, QSizePolicy, QMenu, QApplication,
     QStyledItemDelegate, QStyle, QStyleOptionViewItem,
 )
@@ -31,7 +31,7 @@ import FreeCAD as _fc
 
 from .breadcrumb_widget import BreadcrumbWidget
 from .debug import log, Category
-from .filter_proxy import DoneFilterProxy
+from .filter_proxy import DoneFilterProxy, TextSearchProxy
 
 
 HANDLE_WIDTH = 18
@@ -169,6 +169,11 @@ class TreePanel(QWidget):
         self._proxy = DoneFilterProxy(self)
         self._proxy.setSourceModel(item_model)
 
+        self._search_proxy = TextSearchProxy(self)
+        self._search_proxy.setSourceModel(self._proxy)
+
+        self._searching = False  # True while expandAll() runs during search
+
         self._setup_ui()
         self._restore_view_state()
 
@@ -242,8 +247,15 @@ class TreePanel(QWidget):
 
         layout.addWidget(tb)
 
+        self._search_bar = QLineEdit(self)
+        self._search_bar.setPlaceholderText("Search items… (Esc to close)")
+        self._search_bar.setClearButtonEnabled(True)
+        self._search_bar.textChanged.connect(self._update_search)
+        self._search_bar.hide()
+        layout.addWidget(self._search_bar)
+
         self._tree_view = QTreeView(self)
-        self._tree_view.setModel(self._proxy)
+        self._tree_view.setModel(self._search_proxy)
         self._tree_view.setHeaderHidden(True)
         self._tree_view.setEditTriggers(QAbstractItemView.DoubleClicked)
         self._tree_view.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -326,7 +338,53 @@ class TreePanel(QWidget):
         sc_rename.setContext(Qt.WidgetShortcut)
         sc_rename.activated.connect(self._rename_selected)
 
+        # Ctrl+F — open the search bar (works from tree view or search bar itself).
+        sc_search = QShortcut(QKeySequence(Qt.CTRL | Qt.Key_F), self)
+        sc_search.setContext(Qt.WidgetWithChildrenShortcut)
+        sc_search.activated.connect(self._open_search_bar)
+
+        # Escape — close the search bar when it has focus.
+        sc_escape = QShortcut(QKeySequence(Qt.Key_Escape), self._search_bar)
+        sc_escape.setContext(Qt.WidgetShortcut)
+        sc_escape.activated.connect(self._close_search_bar)
+
         layout.addWidget(self._tree_view)
+
+    # ── proxy index helpers ────────────────────────────────────────────────
+
+    def _to_view_index(self, source_idx):
+        """Map a TodoItemModel source index to the outermost (TextSearchProxy) index."""
+        return self._search_proxy.mapFromSource(self._proxy.mapFromSource(source_idx))
+
+    def _to_source_index(self, view_idx):
+        """Map an outermost (TextSearchProxy) index back to a TodoItemModel source index."""
+        return self._proxy.mapToSource(self._search_proxy.mapToSource(view_idx))
+
+    # ── search bar ─────────────────────────────────────────────────────────
+
+    def _open_search_bar(self):
+        self._search_bar.show()
+        self._search_bar.setFocus()
+        self._search_bar.selectAll()
+
+    def _close_search_bar(self):
+        self._search_bar.clear()   # triggers _update_search(""), restores expansion
+        self._search_bar.hide()
+        self._tree_view.setFocus()
+
+    def _update_search(self, text):
+        was_active = bool(self._search_proxy.search_text)
+        self._search_proxy.set_search_text(text)
+        is_active = bool(self._search_proxy.search_text)
+
+        if is_active and not was_active:
+            # Entering search mode: expand everything so deep matches are visible.
+            self._searching = True
+            self._tree_view.expandAll()
+            self._searching = False
+        elif not is_active and was_active:
+            # Leaving search mode: restore the pre-search expansion state.
+            self._restore_expanded_from_model()
 
     # ── view state persistence ─────────────────────────────────────────────
 
@@ -384,9 +442,9 @@ class TreePanel(QWidget):
                     return
                 src_idx = self._model.index_for_node(node.id)
                 if src_idx.isValid():
-                    proxy_idx = self._proxy.mapFromSource(src_idx)
+                    view_idx = self._to_view_index(src_idx)
                     if node.expanded:
-                        self._tree_view.setExpanded(proxy_idx, True)
+                        self._tree_view.setExpanded(view_idx, True)
                 for child in node.children:
                     _walk(child)
             _walk(self._model._tree.root)
@@ -402,8 +460,7 @@ class TreePanel(QWidget):
         else:
             src_idx = self._model.index_for_node(current_root_id)
             if src_idx.isValid():
-                proxy_idx = self._proxy.mapFromSource(src_idx)
-                self._tree_view.setRootIndex(proxy_idx)
+                self._tree_view.setRootIndex(self._to_view_index(src_idx))
             else:
                 # Node gone; fall back to root.
                 self._breadcrumb_path = ["root"]
@@ -435,7 +492,7 @@ class TreePanel(QWidget):
         proxy_idx = self._tree_view.currentIndex()
         if not proxy_idx.isValid():
             return
-        src_idx = self._proxy.mapToSource(proxy_idx)
+        src_idx = self._to_source_index(proxy_idx)
         node_id = self._model.data(src_idx, Qt.UserRole)
         if not node_id or node_id == "root":
             return
@@ -457,9 +514,9 @@ class TreePanel(QWidget):
     # ── item operations ────────────────────────────────────────────────────
 
     def _current_source_index(self):
-        proxy_idx = self._tree_view.currentIndex()
-        if proxy_idx.isValid():
-            return self._proxy.mapToSource(proxy_idx)
+        view_idx = self._tree_view.currentIndex()
+        if view_idx.isValid():
+            return self._to_source_index(view_idx)
         return QModelIndex()
 
     def _current_view_root_index(self):
@@ -488,15 +545,14 @@ class TreePanel(QWidget):
             src_idx = self._current_view_root_index()
         new_idx = self._model.add_child(src_idx, "New item")
         if src_idx.isValid():
-            proxy_parent = self._proxy.mapFromSource(src_idx)
-            self._tree_view.setExpanded(proxy_parent, True)
+            self._tree_view.setExpanded(self._to_view_index(src_idx), True)
         self._start_edit(new_idx)
 
     def _start_edit(self, src_idx):
         if src_idx.isValid():
-            proxy_idx = self._proxy.mapFromSource(src_idx)
-            self._tree_view.setCurrentIndex(proxy_idx)
-            self._tree_view.edit(proxy_idx)
+            view_idx = self._to_view_index(src_idx)
+            self._tree_view.setCurrentIndex(view_idx)
+            self._tree_view.edit(view_idx)
 
     def _rename_selected(self):
         src_idx = self._current_source_index()
@@ -516,9 +572,9 @@ class TreePanel(QWidget):
             self._model.remove_node(src_idx)
 
     def _on_expansion_changed(self, proxy_index):
-        if self._restoring_expansion:
+        if self._restoring_expansion or self._searching:
             return
-        src_idx = self._proxy.mapToSource(proxy_index)
+        src_idx = self._to_source_index(proxy_index)
         expanded = self._tree_view.isExpanded(proxy_index)
         self._model.set_node_expanded(src_idx, expanded)
 
@@ -562,7 +618,7 @@ class TreePanel(QWidget):
                 self._model.data(src_idx, Qt.UserRole)
             )
             if new_idx.isValid():
-                self._tree_view.setCurrentIndex(self._proxy.mapFromSource(new_idx))
+                self._tree_view.setCurrentIndex(self._to_view_index(new_idx))
             self._update_indent_actions()
 
     def _indent_selected(self):
@@ -580,9 +636,9 @@ class TreePanel(QWidget):
             self._model.indent_node(src_idx)
             new_idx = self._model.index_for_node(node_id)
             if new_idx.isValid():
-                proxy_idx = self._proxy.mapFromSource(new_idx)
-                self._tree_view.setExpanded(self._proxy.parent(proxy_idx), True)
-                self._tree_view.setCurrentIndex(proxy_idx)
+                view_idx = self._to_view_index(new_idx)
+                self._tree_view.setExpanded(self._search_proxy.parent(view_idx), True)
+                self._tree_view.setCurrentIndex(view_idx)
             self._update_indent_actions()
 
     # ── context menu ───────────────────────────────────────────────────────

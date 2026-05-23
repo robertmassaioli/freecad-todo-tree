@@ -150,6 +150,22 @@ class _ClickLogger(QObject):
         return False
 
 
+class _SearchBarEscapeFilter(QObject):
+    # QShortcut with Qt.WidgetShortcut on a QLineEdit child is unreliable in
+    # FreeCAD's PySide environment (never gets registered in Qt's global table),
+    # so we intercept Escape via an event filter instead.
+
+    def __init__(self, close_callback, parent=None):
+        super().__init__(parent)
+        self._close = close_callback
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.KeyPress and event.key() == Qt.Key_Escape:
+            self._close()
+            return True
+        return False
+
+
 class TreePanel(QWidget):
     """
     Reusable panel used by both the dock widget and the main view.
@@ -253,6 +269,8 @@ class TreePanel(QWidget):
         self._search_bar.textChanged.connect(self._update_search)
         self._search_bar.hide()
         layout.addWidget(self._search_bar)
+        self._search_escape_filter = _SearchBarEscapeFilter(self._close_search_bar, self)
+        self._search_bar.installEventFilter(self._search_escape_filter)
 
         self._tree_view = QTreeView(self)
         self._tree_view.setModel(self._search_proxy)
@@ -339,14 +357,11 @@ class TreePanel(QWidget):
         sc_rename.activated.connect(self._rename_selected)
 
         # Ctrl+F — open the search bar (works from tree view or search bar itself).
-        sc_search = QShortcut(QKeySequence(Qt.CTRL | Qt.Key_F), self)
-        sc_search.setContext(Qt.WidgetWithChildrenShortcut)
-        sc_search.activated.connect(self._open_search_bar)
+        self._sc_search = QShortcut(QKeySequence(Qt.CTRL | Qt.Key_F), self)
+        self._sc_search.setContext(Qt.WidgetWithChildrenShortcut)
+        self._sc_search.activated.connect(self._open_search_bar)
 
-        # Escape — close the search bar when it has focus.
-        sc_escape = QShortcut(QKeySequence(Qt.Key_Escape), self._search_bar)
-        sc_escape.setContext(Qt.WidgetShortcut)
-        sc_escape.activated.connect(self._close_search_bar)
+        # Escape is handled by _SearchBarEscapeFilter installed on self._search_bar.
 
         layout.addWidget(self._tree_view)
 
@@ -363,6 +378,9 @@ class TreePanel(QWidget):
     # ── search bar ─────────────────────────────────────────────────────────
 
     def _open_search_bar(self):
+        if self._search_bar.isVisible():
+            self._close_search_bar()
+            return
         self._search_bar.show()
         self._search_bar.setFocus()
         self._search_bar.selectAll()

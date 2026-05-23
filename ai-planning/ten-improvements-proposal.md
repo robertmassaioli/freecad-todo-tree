@@ -503,7 +503,7 @@ Schema version must be bumped (see Improvement 4).
 | # | Improvement | Area | Effort | Priority | Status |
 |---|-------------|------|--------|----------|--------|
 | 1 | F2 shortcut to rename | Usability | Trivial | High | ✓ Done |
-| 2 | Live text search / quick-filter | Functional | Medium | High | Open |
+| 2 | Live text search / quick-filter | Functional | Medium | High | ✓ Done |
 | 3 | Export to Markdown / plain text | Functional | Medium | Medium | Open |
 | 4 | JSON schema versioning | Robustness | Low-Medium | Medium | Open |
 | 5 | Copy / duplicate subtree | Functional | Medium | Medium | Open |

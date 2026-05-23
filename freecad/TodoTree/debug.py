@@ -26,6 +26,7 @@ class Category(enum.Enum):
     DOCUMENT   = "document"    # document open / close / switch lifecycle
     OBJECT     = "object"      # FreeCAD TodoTree object and ViewProvider lifecycle
     BREADCRUMB = "breadcrumb"  # breadcrumb bar layout and truncation decisions
+    SEARCH     = "search"      # text search bar open/close and key-event routing
 
 
 # Add Category members here to enable their logging output.

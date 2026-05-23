@@ -444,11 +444,12 @@ stored in `TreePanel` and used for navigation; only the display is truncated.
 
 ---
 
-## 10. Per-item notes / description field
+## 10. Per-item notes / description field ✗ Won't do
 
 **Area:** Functional  
 **Effort:** Medium-High (4–6 hours)  
-**Priority:** Low-Medium
+**Priority:** Low-Medium  
+**Decision:** Overcomplicates the addon. Rejected 2026-05-23.
 
 ### Problem
 
@@ -510,7 +511,7 @@ Schema version must be bumped (see Improvement 4).
 | 7 | Unit test suite | Engineering | High | High | ✓ Done |
 | 8 | Contributing & architecture docs | Documentation | Low-Medium | Medium | ✓ Done |
 | 9 | Breadcrumb truncation | Usability | Low-Medium | Low | ✓ Done |
-| 10 | Per-item notes field | Functional | Medium-High | Low-Medium | Open |
+| 10 | Per-item notes field | Functional | Medium-High | Low-Medium | ✗ Won't do |
 
 ---
 
